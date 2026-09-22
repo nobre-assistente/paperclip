@@ -102,6 +102,17 @@ export async function execute(
   }
 
   if (!threadId) {
+    const candidateId =
+      (typeof ctx.runtime.sessionParams?.sessionId === "string" && ctx.runtime.sessionParams.sessionId.trim()) ||
+      (typeof ctx.runtime.sessionDisplayId === "string" && ctx.runtime.sessionDisplayId.trim()) ||
+      (typeof ctx.runtime.sessionId === "string" && ctx.runtime.sessionId.trim()) ||
+      null;
+    if (candidateId) {
+      threadId = candidateId;
+    }
+  }
+
+  if (!threadId) {
     try {
       const createThreadRes = await fetch(`${config.baseUrl}/threads`, {
         method: "POST",
@@ -305,6 +316,8 @@ export async function execute(
       timedOut: false,
       provider: "langgraph",
       usage,
+      sessionId: threadId,
+      sessionDisplayId: threadId,
       sessionParams: {
         threadId: sessionParams.threadId,
         assistantId: sessionParams.assistantId,

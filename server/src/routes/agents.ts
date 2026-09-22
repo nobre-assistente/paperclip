@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { resolveAgentAppearance, agentAvatarUrl } from "@paperclipai/shared";
 import { listOpenRouterModels } from "../services/openrouter-models.js";
 import { prepareManagedAiRuntime, assertManagedAiProjectAuth, stripAiAuthBindings } from "../services/ai-connection-runtime.js";
@@ -1631,19 +1632,33 @@ export function agentRoutes(
     agent: NonNullable<Awaited<ReturnType<typeof svc.getById>>>,
     options?: { restricted?: boolean },
   ) {
-    const [chainOfCommand, accessState] = await Promise.all([
+    const [chainOfCommand, accessState, runtimeState] = await Promise.all([
       svc.getChainOfCommand(agent.id),
       buildAgentAccessState(agent),
+      heartbeat.getRuntimeState(agent.id).catch(() => null),
     ]);
 
     const baseAgent = redactAgentRowForResponse(
       options?.restricted ? redactForRestrictedAgentView(agent) : agent,
     );
 
+    const sessionParams =
+      runtimeState?.sessionParamsJson ??
+      (runtimeState?.sessionDisplayId || runtimeState?.sessionId
+        ? { threadId: runtimeState.sessionDisplayId ?? runtimeState.sessionId }
+        : null);
+
     return {
       ...baseAgent,
       chainOfCommand,
       access: accessState,
+      runtime: runtimeState
+        ? {
+            sessionId: runtimeState.sessionDisplayId ?? runtimeState.sessionId,
+            sessionParams,
+            state: runtimeState,
+          }
+        : null,
     };
   }
 
@@ -4397,6 +4412,19 @@ export function agentRoutes(
     );
   });
 
+  router.get("/agents/:id/runs", async (req, res) => {
+    const id = req.params.id as string;
+    const agent = await getAccessibleResource(req, res, svc.getById(id), "Agent not found");
+    if (!agent) return;
+    assertCompanyAccess(req, agent.companyId);
+    if (!(await assertRunTelemetryReadAllowed(req, res, agent.companyId))) return;
+    const limitParam = req.query.limit as string | undefined;
+    const limit = limitParam ? Math.max(1, Math.min(1000, parseInt(limitParam, 10) || 200)) : undefined;
+    const summary = req.query.summary === "true" || req.query.summary === "1";
+    const runs = await heartbeat.list(agent.companyId, agent.id, limit, { summary });
+    res.json(await runRedactions.redactForRuns(agent.companyId, runs));
+  });
+
   router.post("/agents/:id/runtime-state/reset-session", validate(resetAgentSessionSchema), async (req, res) => {
     assertBoard(req);
     const id = req.params.id as string;
@@ -4721,8 +4749,16 @@ export function agentRoutes(
     res.status(outcome.status).json(outcome.body);
   });
 
-  router.post("/companies/:companyId/agents", validate(createAgentSchema), async (req, res) => {
-    const companyId = req.params.companyId as string;
+  router.post(["/companies/:companyId/agents", "/agents"], validate(createAgentSchema.extend({ companyId: z.string().optional() })), async (req, res) => {
+    let companyId = (req.params.companyId as string | undefined) ?? (req.body?.companyId as string | undefined);
+    if (!companyId) {
+      const defaultCompany = await db.select({ id: companies.id }).from(companies).limit(1).then((rows) => rows[0] ?? null);
+      companyId = defaultCompany?.id;
+    }
+    if (!companyId) {
+      res.status(400).json({ error: "Company ID is required" });
+      return;
+    }
     await assertCanCreateAgentsForCompany(req, companyId);
 
     const company = await db

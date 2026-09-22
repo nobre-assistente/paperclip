@@ -119,6 +119,7 @@ import {
   agentConfigurationDoc as openclawGatewayAgentConfigurationDoc,
   models as openclawGatewayModels,
 } from "@paperclipai/adapter-openclaw-gateway";
+import { langGraphAdapter } from "@paperclipai/adapter-langgraph/server";
 import { listCodexModels, refreshCodexModels } from "./codex-models.js";
 import { listCursorModels } from "./cursor-models.js";
 import {
@@ -968,6 +969,8 @@ export function registerServerAdapter(adapter: ServerAdapterModule): void {
   }
   adaptersByType.set(adapter.type, adapter);
 }
+
+registerServerAdapter(langGraphAdapter);
 
 export function unregisterServerAdapter(type: string): void {
   if (type === processAdapter.type || type === httpAdapter.type) return;
