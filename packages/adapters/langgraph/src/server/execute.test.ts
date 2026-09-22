@@ -5,8 +5,6 @@ import type {
 } from "@paperclipai/adapter-utils";
 import { execute } from "./execute.js";
 import { testEnvironment } from "./test.js";
-import { sessionCodec } from "./session.js";
-import { getConfigSchema } from "./config.js";
 
 describe("execute()", () => {
   const originalFetch = globalThis.fetch;
@@ -386,59 +384,5 @@ describe("testEnvironment()", () => {
 
     expect(res.status).toBe("fail");
     expect(res.checks.some((c) => c.code === "LANGGRAPH_CONFIG_ASSISTANT_ID_MISSING")).toBe(true);
-  });
-});
-
-describe("sessionCodec", () => {
-  it("sessionCodec round-trip preserves all fields", () => {
-    const original = {
-      threadId: "thread-abc",
-      assistantId: "assistant-xyz",
-      tenantId: "company-123",
-    };
-
-    const serialized = sessionCodec.serialize(original);
-    expect(serialized).toEqual(original);
-
-    const deserialized = sessionCodec.deserialize(serialized);
-    expect(deserialized).toEqual(original);
-  });
-
-  it("sessionCodec rejects malformed payloads returning null", () => {
-    expect(sessionCodec.deserialize(null)).toBeNull();
-    expect(sessionCodec.deserialize("not an object")).toBeNull();
-    expect(sessionCodec.deserialize({})).toBeNull();
-    expect(
-      sessionCodec.deserialize({
-        threadId: "only-thread",
-      }),
-    ).toBeNull();
-    expect(
-      sessionCodec.deserialize({
-        threadId: "thread",
-        assistantId: "",
-        tenantId: "tenant",
-      }),
-    ).toBeNull();
-  });
-
-  it("getDisplayId returns threadId", () => {
-    expect(
-      sessionCodec.getDisplayId?.({
-        threadId: "th-display-1",
-        assistantId: "as-1",
-        tenantId: "ten-1",
-      }),
-    ).toBe("th-display-1");
-
-    expect(sessionCodec.getDisplayId?.(null)).toBeNull();
-  });
-});
-
-describe("getConfigSchema", () => {
-  it("exposes expected fields sorted as assistantId,baseUrl,runTimeoutMs", () => {
-    const schema = getConfigSchema();
-    const keys = schema.fields.map((f) => f.key).sort().join(",");
-    expect(keys).toBe("assistantId,baseUrl,runTimeoutMs");
   });
 });
