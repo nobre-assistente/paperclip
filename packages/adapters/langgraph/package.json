@@ -1,0 +1,9 @@
+{
+  "name": "@paperclipai/adapter-langgraph",
+  "version": "0.3.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}
