@@ -13,7 +13,7 @@ const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 async function broker(resolveCredentials = vi.fn(async (binding: ReturnType<typeof run>) => ({
   status: "available", env: { GH_TOKEN: `fixture-${binding.runId}` },
-})), remote = false, bridgeUnavailable = false) {
+})), remote = false, bridgeUnavailable = false, onLog?: (stream: "stdout" | "stderr", chunk: string) => Promise<void>) {
   const root = await mkdtemp(path.join(tmpdir(), "native-github-reuse-"));
   cleanups.push(() => rm(root, { recursive: true, force: true }));
   const bin = path.join(root, "real-bin");
@@ -32,7 +32,7 @@ async function broker(resolveCredentials = vi.fn(async (binding: ReturnType<type
   const target = remote ? { kind: "remote" as const, transport: "sandbox" as const, providerKey: "test",
     remoteCwd: root, runner: { execute }, streamRunLogs: false } : null;
   const result = await createNativeGitHubAccess({ scope, target, cwd: root,
-    env: { PATH: `${bin}:${path.dirname(process.execPath)}:/usr/bin:/bin`, PAPERCLIP_API_KEY: "old-run-api-key" }, resolveCredentials },
+    env: { PATH: `${bin}:${path.dirname(process.execPath)}:/usr/bin:/bin`, PAPERCLIP_API_KEY: "old-run-api-key" }, resolveCredentials, onLog },
     bridgeUnavailable ? async () => { throw new Error("fixture bridge unavailable"); } : undefined);
   cleanups.push(result.stop);
   return { ...result, root, resolveCredentials };
@@ -113,8 +113,10 @@ it.each([403, 409, 500])("preserves denial/steering without leaking errors (%s)"
   expect(await response.text()).not.toContain("secret-value");
 });
 
-it("keeps anonymous launchers usable when the remote broker cannot start", async () => {
-  const b = await broker(undefined, true, true);
+it.each([false, true])("keeps anonymous launchers usable when the remote broker cannot start (logging fails: %s)", async (loggingFails) => {
+  const onLog = vi.fn(async () => { if (loggingFails) throw new Error("fixture log sink unavailable"); });
+  const b = await broker(undefined, true, true, onLog);
+  expect(onLog).toHaveBeenCalledWith("stderr", expect.stringContaining("continuing without managed GitHub access"));
   b.activate(run("a"));
   expect(b.ready).toBe(false);
   expect(b.env.PAPERCLIP_GITHUB_BROKER_TOKEN).toBe("");
