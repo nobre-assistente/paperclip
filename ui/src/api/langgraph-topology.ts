@@ -5,6 +5,7 @@ export interface LangGraphNode {
   id: string;
   type: string;
   data: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 export interface LangGraphEdge {

@@ -5,10 +5,7 @@ import {
   Controls,
   MiniMap,
   Panel,
-  MarkerType,
   type Node,
-  type Edge,
-  type NodeTypes,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useQuery } from "@tanstack/react-query";
@@ -17,110 +14,19 @@ import { useParams, useSearchParams } from "@/lib/router";
 import { useCompany } from "@/context/CompanyContext";
 import { useBreadcrumbs } from "@/context/BreadcrumbContext";
 import { agentsApi } from "@/api/agents";
-import { useGraphTopology, type LangGraphTopology } from "@/api/langgraph-topology";
+import { useGraphTopology } from "@/api/langgraph-topology";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/EmptyState";
 import { PaperclipLoading } from "@/components/AnimatedPaperclipIcon";
 import { cn } from "@/lib/utils";
-import { CanvasNode, type CanvasNodeData } from "./CanvasNode";
+import { nodeTypes } from "./CanvasNode";
+import { toReactFlow, getNodeDetail, resolveCanvasNodeType } from "./toReactFlow";
+import { NodePropertiesPanel } from "./NodePropertiesPanel";
+import type { CanvasNodeType, NodeDetail, CanvasNodeData } from "./types";
 
-const nodeTypes: NodeTypes = {
-  custom: CanvasNode,
-};
-
-function computeLayout(topology: LangGraphTopology): { nodes: Node<CanvasNodeData>[]; edges: Edge[] } {
-  const { nodes: lgNodes, edges: lgEdges } = topology;
-
-  const inDegree = new Map<string, number>();
-  const adj = new Map<string, string[]>();
-
-  for (const node of lgNodes) {
-    inDegree.set(node.id, 0);
-    adj.set(node.id, []);
-  }
-
-  for (const edge of lgEdges) {
-    if (adj.has(edge.source)) {
-      adj.get(edge.source)!.push(edge.target);
-    }
-    inDegree.set(edge.target, (inDegree.get(edge.target) ?? 0) + 1);
-  }
-
-  const levels = new Map<string, number>();
-  const queue: string[] = [];
-
-  for (const node of lgNodes) {
-    if ((inDegree.get(node.id) ?? 0) === 0 || node.id === "__start__") {
-      levels.set(node.id, 0);
-      queue.push(node.id);
-    }
-  }
-
-  if (queue.length === 0 && lgNodes.length > 0) {
-    levels.set(lgNodes[0].id, 0);
-    queue.push(lgNodes[0].id);
-  }
-
-  while (queue.length > 0) {
-    const curr = queue.shift()!;
-    const currLevel = levels.get(curr) ?? 0;
-    const neighbors = adj.get(curr) ?? [];
-    for (const next of neighbors) {
-      if (!levels.has(next)) {
-        levels.set(next, currLevel + 1);
-        queue.push(next);
-      }
-    }
-  }
-
-  const levelGroups = new Map<number, typeof lgNodes>();
-  for (const node of lgNodes) {
-    const lvl = levels.get(node.id) ?? 0;
-    if (!levelGroups.has(lvl)) {
-      levelGroups.set(lvl, []);
-    }
-    levelGroups.get(lvl)!.push(node);
-  }
-
-  const nodes: Node<CanvasNodeData>[] = [];
-  for (const [lvl, group] of levelGroups.entries()) {
-    const count = group.length;
-    group.forEach((lgNode, idx) => {
-      const x = (idx - (count - 1) / 2) * 260 + 350;
-      const y = lvl * 130 + 50;
-      nodes.push({
-        id: lgNode.id,
-        type: "custom",
-        position: { x, y },
-        data: {
-          label: lgNode.id,
-          nodeType: lgNode.type,
-          nodeData: lgNode.data,
-        },
-      });
-    });
-  }
-
-  const edges: Edge[] = lgEdges.map((lgEdge, idx) => ({
-    id: `edge-${idx}-${lgEdge.source}-${lgEdge.target}`,
-    source: lgEdge.source,
-    target: lgEdge.target,
-    animated: lgEdge.conditional,
-    label: lgEdge.conditional ? "conditional" : undefined,
-    labelStyle: { fill: "var(--muted-foreground)" },
-    markerEnd: {
-      type: MarkerType.ArrowClosed,
-      color: "var(--border)",
-    },
-    style: {
-      stroke: "var(--border)",
-      strokeWidth: 1.5,
-    },
-  }));
-
-  return { nodes, edges };
-}
+export type { CanvasNodeType, NodeDetail, CanvasNodeData };
+export { toReactFlow, getNodeDetail, resolveCanvasNodeType, nodeTypes };
 
 export function Canvas() {
   const { setBreadcrumbs } = useBreadcrumbs();
@@ -154,6 +60,7 @@ export function Canvas() {
 
   const [inputAssistantId, setInputAssistantId] = useState(defaultAssistantId);
   const [activeAssistantId, setActiveAssistantId] = useState(defaultAssistantId);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   useEffect(() => {
     if (defaultAssistantId && !activeAssistantId) {
@@ -182,13 +89,24 @@ export function Canvas() {
 
   const { nodes, edges } = useMemo(() => {
     if (!topology) return { nodes: [], edges: [] };
-    return computeLayout(topology);
+    return toReactFlow(topology);
   }, [topology]);
+
+  const selectedNode = useMemo(() => {
+    if (!selectedNodeId || !topology) return null;
+    return topology.nodes.find((n) => n.id === selectedNodeId) ?? null;
+  }, [selectedNodeId, topology]);
+
+  const nodeDetail = useMemo<NodeDetail | null>(() => {
+    if (!selectedNode) return null;
+    return getNodeDetail(selectedNode, topology?.edges ?? []);
+  }, [selectedNode, topology]);
 
   const handleSearchSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (inputAssistantId.trim()) {
       setActiveAssistantId(inputAssistantId.trim());
+      setSelectedNodeId(null);
       setSearchParams({ assistantId: inputAssistantId.trim() });
     }
   }, [inputAssistantId, setSearchParams]);
@@ -196,8 +114,17 @@ export function Canvas() {
   const handleSelectAgent = useCallback((assistantId: string) => {
     setInputAssistantId(assistantId);
     setActiveAssistantId(assistantId);
+    setSelectedNodeId(null);
     setSearchParams({ assistantId });
   }, [setSearchParams]);
+
+  const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
+    setSelectedNodeId(node.id);
+  }, []);
+
+  const handlePaneClick = useCallback(() => {
+    setSelectedNodeId(null);
+  }, []);
 
   return (
     <div className="flex flex-col h-full w-full min-h-0 bg-background text-foreground p-4 gap-4">
@@ -304,21 +231,33 @@ export function Canvas() {
             onAction={() => refetch()}
           />
         ) : (
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            fitView
-            minZoom={0.2}
-            maxZoom={2}
-          >
-            <Background color="var(--border)" gap={20} />
-            <Controls className="border border-border bg-card text-foreground" />
-            <MiniMap className="border border-border bg-card" zoomable pannable />
-            <Panel position="top-left" className="bg-background/80 backdrop-blur-xs border border-border p-2 rounded-md shadow-xs text-xs text-muted-foreground">
-              Graph: <span className="font-semibold text-foreground">{activeAssistantId}</span> • {nodes.length} nodes • {edges.length} edges
-            </Panel>
-          </ReactFlow>
+          <>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              nodeTypes={nodeTypes}
+              fitView
+              minZoom={0.2}
+              maxZoom={2}
+              nodesDraggable={false}
+              nodesConnectable={false}
+              elementsSelectable={true}
+              onNodeClick={handleNodeClick}
+              onPaneClick={handlePaneClick}
+            >
+              <Background color="var(--border)" gap={20} />
+              <Controls className="border border-border bg-card text-foreground" showInteractive={false} />
+              <MiniMap className="border border-border bg-card" zoomable pannable />
+              <Panel position="top-left" className="bg-background/80 backdrop-blur-xs border border-border p-2 rounded-md shadow-xs text-xs text-muted-foreground">
+                Graph: <span className="font-semibold text-foreground">{activeAssistantId}</span> • {nodes.length} nodes • {edges.length} edges
+              </Panel>
+            </ReactFlow>
+
+            <NodePropertiesPanel
+              nodeDetail={nodeDetail}
+              onClose={() => setSelectedNodeId(null)}
+            />
+          </>
         )}
       </div>
     </div>
