@@ -25257,6 +25257,87 @@ export function heartbeatService(
               });
             }
           }
+
+          const pendingResume = (adapterResult.sessionParams?.pendingResume ??
+            nextSessionState.params?.pendingResume) as
+            | { interruptId?: string; requestId?: string }
+            | undefined;
+          if (
+            pendingResume?.interruptId &&
+            typeof pendingResume.interruptId === "string" &&
+            pendingResume.interruptId.trim().length > 0
+          ) {
+            try {
+              const interruptId = pendingResume.interruptId.trim();
+              const existingApproval = await db
+                .select({ id: approvals.id })
+                .from(approvals)
+                .where(
+                  and(
+                    eq(approvals.companyId, agent.companyId),
+                    sql`${approvals.payload} ->> 'interruptId' = ${interruptId}`,
+                  ),
+                )
+                .limit(1)
+                .then((rows) => rows[0] ?? null);
+
+              if (!existingApproval) {
+                const created = await db
+                  .insert(approvals)
+                  .values({
+                    companyId: agent.companyId,
+                    type: "request_board_approval",
+                    requestedByAgentId: agent.id,
+                    status: "pending",
+                    payload: {
+                      title: `HITL Resume: ${adapterResult.question?.prompt ?? "LangGraph Approval"}`,
+                      prompt: adapterResult.question?.prompt ?? "",
+                      interruptId,
+                      threadId:
+                        adapterResult.sessionId ??
+                        nextSessionState.displayId ??
+                        null,
+                      adapterType: agent.adapterType,
+                      choices: adapterResult.question?.choices ?? [],
+                    },
+                  })
+                  .returning()
+                  .then((rows) => rows[0]);
+
+                if (created && issueRef?.id) {
+                  await db
+                    .insert(issueApprovals)
+                    .values({
+                      companyId: agent.companyId,
+                      issueId: issueRef.id,
+                      approvalId: created.id,
+                      linkedByAgentId: agent.id,
+                    })
+                    .catch(() => {});
+                }
+
+                await logActivity(db, {
+                  companyId: agent.companyId,
+                  actorType: "agent",
+                  actorId: agent.id,
+                  agentId: agent.id,
+                  action: "approval.created",
+                  entityType: "approval",
+                  entityId: created.id,
+                  details: {
+                    type: "request_board_approval",
+                    interruptId,
+                    issueId: issueRef?.id ?? null,
+                  },
+                });
+              }
+            } catch (approvalErr) {
+              logger.warn(
+                { err: approvalErr, agentId: agent.id },
+                "failed to record HITL approval for pending interrupt",
+              );
+            }
+          }
         }
         await finalizeAgentStatus(agent.id, outcome, runErrorMessage, {
           keepIdleOnFailure:

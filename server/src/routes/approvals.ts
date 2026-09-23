@@ -1,6 +1,6 @@
 import { Router, type Request } from "express";
 import { eq } from "drizzle-orm";
-import { heartbeatRuns, type Db } from "@paperclipai/db";
+import { companies, heartbeatRuns, type Db } from "@paperclipai/db";
 import {
   addApprovalCommentSchema,
   createApprovalSchema,
@@ -202,8 +202,19 @@ export function approvalRoutes(
     return false;
   }
 
-  router.get("/companies/:companyId/approvals", async (req, res) => {
-    const companyId = req.params.companyId as string;
+  router.get(["/companies/:companyId/approvals", "/approvals"], async (req, res) => {
+    let companyId = req.params.companyId as string | undefined;
+    if (!companyId) {
+      companyId = req.query.companyId as string | undefined;
+    }
+    if (!companyId) {
+      const defaultCompany = await db.select({ id: companies.id }).from(companies).limit(1).then((rows) => rows[0] ?? null);
+      companyId = defaultCompany?.id;
+    }
+    if (!companyId) {
+      res.status(400).json({ error: "Company ID is required" });
+      return;
+    }
     assertCompanyAccess(req, companyId);
     if (!(await assertApprovalAccessAllowed(req, res, companyId))) return;
     const status = req.query.status as string | undefined;

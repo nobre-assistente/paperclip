@@ -25,3 +25,4 @@ Core fields:
 `;
 
 export * from "./types.js";
+export { buildResumePayload } from "./server/interrupt.js";

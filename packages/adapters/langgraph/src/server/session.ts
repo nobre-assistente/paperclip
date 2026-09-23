@@ -16,11 +16,34 @@ export const sessionCodec: AdapterSessionCodec = {
       return null;
     }
 
-    const result: Record<string, string> = {
+    const result: Record<string, unknown> = {
       threadId,
       assistantId,
       tenantId,
     };
+
+    if (typeof params.interruptId === "string" && params.interruptId.trim().length > 0) {
+      result.interruptId = params.interruptId.trim();
+    }
+
+    if (isObjectRecord(params.pendingResume)) {
+      const interruptId =
+        typeof params.pendingResume.interruptId === "string"
+          ? params.pendingResume.interruptId.trim()
+          : "";
+      const requestId =
+        typeof params.pendingResume.requestId === "string"
+          ? params.pendingResume.requestId.trim()
+          : "";
+
+      if (interruptId && requestId) {
+        result.pendingResume = {
+          interruptId,
+          requestId,
+        };
+      }
+    }
+
     return result;
   },
 
@@ -35,11 +58,34 @@ export const sessionCodec: AdapterSessionCodec = {
       return null;
     }
 
-    const result: Record<string, string> = {
+    const result: Record<string, unknown> = {
       threadId,
       assistantId,
       tenantId,
     };
+
+    if (typeof raw.interruptId === "string" && raw.interruptId.trim().length > 0) {
+      result.interruptId = raw.interruptId.trim();
+    }
+
+    if (isObjectRecord(raw.pendingResume)) {
+      const interruptId =
+        typeof raw.pendingResume.interruptId === "string"
+          ? raw.pendingResume.interruptId.trim()
+          : "";
+      const requestId =
+        typeof raw.pendingResume.requestId === "string"
+          ? raw.pendingResume.requestId.trim()
+          : "";
+
+      if (interruptId && requestId) {
+        result.pendingResume = {
+          interruptId,
+          requestId,
+        };
+      }
+    }
+
     return result;
   },
 

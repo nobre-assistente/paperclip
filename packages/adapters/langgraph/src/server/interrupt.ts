@@ -1,6 +1,7 @@
 import type {
   PaperclipQuestion,
   PaperclipQuestionOption,
+  PaperclipQuestionResponse,
   PaperclipQuestionSet,
 } from "@paperclipai/adapter-utils";
 import type {
@@ -169,4 +170,98 @@ export function extractInterrupt(
   }
 
   return null;
+}
+
+export function buildResumePayload(
+  response: PaperclipQuestionResponse,
+  interrupt: LangGraphInterrupt,
+): Record<string, unknown> {
+  const answer =
+    response?.answers?.[interrupt.interrupt_id] ??
+    (response?.answers ? Object.values(response.answers)[0] : undefined);
+
+  if (!answer) {
+    return { action: "cancel" };
+  }
+
+  const selectedOptionIds = Array.isArray(answer.selectedOptionIds)
+    ? answer.selectedOptionIds
+        .map((s) => (typeof s === "string" ? s.trim() : String(s).trim()))
+        .filter((s) => s.length > 0)
+    : [];
+
+  const text = typeof answer.text === "string" ? answer.text.trim() : undefined;
+  const customText =
+    typeof answer.customText === "string" ? answer.customText.trim() : undefined;
+
+  let action: string | undefined;
+  let value: string | undefined;
+
+  if (interrupt.kind === "approval") {
+    if (selectedOptionIds.length > 0) {
+      action = selectedOptionIds[0];
+    } else if (text !== undefined && text.length > 0) {
+      action = text;
+    } else if (customText !== undefined && customText.length > 0) {
+      action = customText;
+    } else {
+      action = "approve";
+    }
+  } else if (interrupt.kind === "input") {
+    if (text !== undefined && text.length > 0) {
+      action = text;
+      value = text;
+    } else if (customText !== undefined && customText.length > 0) {
+      action = customText;
+      value = customText;
+    } else if (selectedOptionIds.length > 0) {
+      action = selectedOptionIds[0];
+      value = selectedOptionIds[0];
+    } else {
+      action = "";
+      value = "";
+    }
+  } else {
+    // elicitation
+    if (selectedOptionIds.length > 0) {
+      action = selectedOptionIds[0];
+    }
+    if (text !== undefined && text.length > 0) {
+      value = text;
+      if (!action) action = text;
+    } else if (customText !== undefined && customText.length > 0) {
+      value = customText;
+      if (!action) action = customText;
+    }
+    if (!action) {
+      action = "approve";
+    }
+  }
+
+  const entries: [string, unknown][] = [];
+
+  if (action !== undefined) {
+    entries.push(["action", action]);
+  }
+  if (customText !== undefined && customText.length > 0) {
+    entries.push(["customText", customText]);
+  }
+  if (selectedOptionIds.length > 1) {
+    entries.push(["selectedOptionIds", [...selectedOptionIds].sort()]);
+  }
+  if (text !== undefined && text.length > 0) {
+    entries.push(["text", text]);
+  }
+  if (value !== undefined) {
+    entries.push(["value", value]);
+  }
+
+  entries.sort(([k1], [k2]) => k1.localeCompare(k2));
+
+  const payload: Record<string, unknown> = {};
+  for (const [k, v] of entries) {
+    payload[k] = v;
+  }
+
+  return payload;
 }

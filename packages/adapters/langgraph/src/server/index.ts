@@ -6,6 +6,7 @@ import {
   agentConfigurationDoc,
 } from "../index.js";
 import {
+  buildResumePayload,
   execute,
   extractInterrupt,
   parseLangGraphInterrupt,
@@ -24,6 +25,7 @@ export {
   extractInterrupt,
   parseLangGraphInterrupt,
   toQuestionSet,
+  buildResumePayload,
   type,
   label,
   models,

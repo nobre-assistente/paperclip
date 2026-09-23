@@ -120,4 +120,53 @@ describe("sessionCodec", () => {
       }),
     ).toBeNull();
   });
+
+  it("pendingResume persisted in sessionParams", () => {
+    const sessionWithPendingResume = {
+      threadId: "thread-hitl-123",
+      assistantId: "asst-hitl-456",
+      tenantId: "tenant-hitl-789",
+      interruptId: "interrupt-step-1",
+      pendingResume: {
+        interruptId: "interrupt-step-1",
+        requestId: "request-uuid-abc",
+      },
+    };
+
+    const serialized = sessionCodec.serialize(sessionWithPendingResume);
+    expect(serialized).toEqual(sessionWithPendingResume);
+
+    const deserialized = sessionCodec.deserialize(serialized);
+    expect(deserialized).toEqual(sessionWithPendingResume);
+    expect(deserialized?.pendingResume).toEqual({
+      interruptId: "interrupt-step-1",
+      requestId: "request-uuid-abc",
+    });
+
+    // Strips extraneous secrets while preserving pendingResume
+    const withSecrets = {
+      ...sessionWithPendingResume,
+      secretToken: "super-secret-token",
+    };
+    const serializedClean = sessionCodec.serialize(withSecrets);
+    expect(serializedClean).toEqual(sessionWithPendingResume);
+    expect(serializedClean).not.toHaveProperty("secretToken");
+
+    // Malformed pendingResume is omitted but valid base params survive
+    const withMalformedPending = {
+      threadId: "thread-hitl-123",
+      assistantId: "asst-hitl-456",
+      tenantId: "tenant-hitl-789",
+      pendingResume: {
+        interruptId: 123,
+      },
+    };
+    const deserializedMalformed = sessionCodec.deserialize(withMalformedPending);
+    expect(deserializedMalformed).toEqual({
+      threadId: "thread-hitl-123",
+      assistantId: "asst-hitl-456",
+      tenantId: "tenant-hitl-789",
+    });
+    expect(deserializedMalformed).not.toHaveProperty("pendingResume");
+  });
 });

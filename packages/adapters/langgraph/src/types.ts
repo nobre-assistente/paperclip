@@ -11,19 +11,31 @@ export interface LangGraphAdapterConfig {
   runTimeoutMs: number;
 }
 
+export interface PendingResumeInfo {
+  interruptId: string;
+  requestId: string;
+}
+
 export interface LangGraphSessionParams {
   threadId: string;
   assistantId: string;
   tenantId: string;
+  interruptId?: string;
+  pendingResume?: PendingResumeInfo;
 }
 
 export interface LangGraphRunConfig {
   configurable: Record<string, JsonValue>;
 }
 
+export interface LangGraphResumeCommand {
+  resume: Record<string, unknown> | JsonValue;
+}
+
 export interface LangGraphRunRequest {
   assistant_id: string;
-  input: Record<string, JsonValue>;
+  input?: Record<string, JsonValue>;
+  command?: LangGraphResumeCommand;
   config: LangGraphRunConfig;
 }
 

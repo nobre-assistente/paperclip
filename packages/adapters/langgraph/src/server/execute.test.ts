@@ -2,8 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   AdapterExecutionContext,
   AdapterExecutionResult,
+  PaperclipQuestionResponse,
 } from "@paperclipai/adapter-utils";
-import { execute, extractInterrupt, toQuestionSet } from "./execute.js";
+import {
+  buildResumePayload,
+  execute,
+  extractInterrupt,
+  toQuestionSet,
+} from "./execute.js";
 import { testEnvironment } from "./test.js";
 import type { LangGraphInterrupt } from "../types.js";
 
@@ -493,6 +499,191 @@ describe("execute()", () => {
     expect(result.errorMessage).toContain("not contain a valid interrupt");
     expect(result.sessionParams?.threadId).toBe("thread-missing-payload");
   });
+
+  it("resumes run carrying Command(resume=payload) when approval_approved wake occurs", async () => {
+    let capturedBody = "";
+    let capturedUrl = "";
+
+    const fetchMock = vi.fn().mockImplementation((input: string | URL | Request, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      capturedUrl = url;
+      if (init?.body) {
+        capturedBody = init.body.toString();
+      }
+
+      if (url.includes("/runs/wait")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              run_id: "run-resumed-1",
+              thread_id: "thread-resume-hitl",
+              status: "success",
+              values: {
+                release_decision: "approved",
+                status: "released",
+                summary: "Cryptographic release executed successfully after approval.",
+              },
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response("Not found", { status: 404 }));
+    });
+
+    globalThis.fetch = fetchMock;
+
+    const ctx = createTestContext({
+      runtime: {
+        sessionId: "thread-resume-hitl",
+        sessionDisplayId: "thread-resume-hitl",
+        taskKey: "task-abc",
+        sessionParams: {
+          threadId: "thread-resume-hitl",
+          assistantId: "assistant-graph-1",
+          tenantId: "company-real-tenant",
+          interruptId: "int-exec-approval",
+          pendingResume: {
+            interruptId: "int-exec-approval",
+            requestId: "req-approval-1",
+          },
+        },
+      },
+      context: {
+        taskId: "task-abc",
+        wakeReason: "approval_approved",
+        approvalId: "approval-uuid-1",
+        approvalStatus: "approved",
+      },
+    });
+
+    const result = await execute(ctx);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.summary).toContain("Cryptographic release executed successfully");
+    expect(capturedUrl).toContain("/threads/thread-resume-hitl/runs/wait");
+
+    const parsedBody = JSON.parse(capturedBody) as {
+      assistant_id?: string;
+      command?: { resume?: { action?: string } };
+      input?: unknown;
+    };
+    expect(parsedBody.assistant_id).toBe("assistant-graph-1");
+    expect(parsedBody.command?.resume?.action).toBe("approve");
+    expect(parsedBody.input).toBeUndefined();
+
+    // pendingResume is cleared from sessionParams upon successful resume completion
+    expect(result.sessionParams?.pendingResume).toBeUndefined();
+    expect(result.sessionParams?.threadId).toBe("thread-resume-hitl");
+  });
+
+  it("resumes run with answer response from paperclip question response", async () => {
+    let capturedBody = "";
+
+    const fetchMock = vi.fn().mockImplementation((input: string | URL | Request, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (init?.body) {
+        capturedBody = init.body.toString();
+      }
+
+      if (url.includes("/runs/wait")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              run_id: "run-resumed-2",
+              thread_id: "thread-resume-answer",
+              status: "success",
+              values: {
+                output: "Exception approved and processed.",
+              },
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response("Not found", { status: 404 }));
+    });
+
+    globalThis.fetch = fetchMock;
+
+    const questionResponse: PaperclipQuestionResponse = {
+      schema: "paperclip.question_response.v1",
+      answers: {
+        "int-exception-1": {
+          selectedOptionIds: ["approve_exception"],
+        },
+      },
+    };
+
+    const ctx = createTestContext({
+      runtime: {
+        sessionId: "thread-resume-answer",
+        sessionDisplayId: "thread-resume-answer",
+        taskKey: "task-abc",
+        sessionParams: {
+          threadId: "thread-resume-answer",
+          assistantId: "assistant-graph-1",
+          tenantId: "company-real-tenant",
+          interruptId: "int-exception-1",
+          pendingResume: {
+            interruptId: "int-exception-1",
+            requestId: "int-exception-1",
+          },
+        },
+      },
+      context: {
+        taskId: "task-abc",
+        response: questionResponse,
+      },
+    });
+
+    const result = await execute(ctx);
+
+    expect(result.exitCode).toBe(0);
+    const parsedBody = JSON.parse(capturedBody) as {
+      command?: { resume?: { action?: string } };
+    };
+    expect(parsedBody.command?.resume?.action).toBe("approve_exception");
+  });
+
+  it("rejects resume attempt when resume-token is invalid or missing", async () => {
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock;
+
+    // Has approval context but sessionParams has no interruptId or pendingResume
+    const ctx = createTestContext({
+      runtime: {
+        sessionId: "thread-no-token",
+        sessionDisplayId: "thread-no-token",
+        taskKey: "task-abc",
+        sessionParams: {
+          threadId: "thread-no-token",
+          assistantId: "assistant-graph-1",
+          tenantId: "company-real-tenant",
+        },
+      },
+      context: {
+        taskId: "task-abc",
+        wakeReason: "approval_approved",
+        approvalId: "approval-xyz",
+        approvalStatus: "approved",
+      },
+    });
+
+    const result = await execute(ctx);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.errorMessage).toContain("missing or invalid resume-token");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("toQuestionSet() and extractInterrupt()", () => {
@@ -692,5 +883,120 @@ describe("testEnvironment()", () => {
 
     expect(res.status).toBe("fail");
     expect(res.checks.some((c) => c.code === "LANGGRAPH_CONFIG_ASSISTANT_ID_MISSING")).toBe(true);
+  });
+});
+
+describe("buildResumePayload", () => {
+  it("answer builds deterministic resume payload", () => {
+    // 1. Approval kind with selected option
+    const approvalInterrupt: LangGraphInterrupt = {
+      interrupt_id: "int-approval-1",
+      kind: "approval",
+      prompt: "Approve executive release?",
+      options: [
+        { id: "approve", label: "Approve release" },
+        { id: "reject", label: "Reject release" },
+      ],
+    };
+
+    const approveResponse: PaperclipQuestionResponse = {
+      schema: "paperclip.question_response.v1",
+      answers: {
+        "int-approval-1": {
+          selectedOptionIds: ["approve"],
+        },
+      },
+    };
+
+    const approvePayload = buildResumePayload(approveResponse, approvalInterrupt);
+    expect(approvePayload).toEqual({ action: "approve" });
+
+    const rejectResponse: PaperclipQuestionResponse = {
+      schema: "paperclip.question_response.v1",
+      answers: {
+        "int-approval-1": {
+          selectedOptionIds: ["reject"],
+        },
+      },
+    };
+
+    const rejectPayload = buildResumePayload(rejectResponse, approvalInterrupt);
+    expect(rejectPayload).toEqual({ action: "reject" });
+
+    // 2. Exception approval action
+    const exceptionResponse: PaperclipQuestionResponse = {
+      schema: "paperclip.question_response.v1",
+      answers: {
+        "int-approval-1": {
+          selectedOptionIds: ["approve_exception"],
+        },
+      },
+    };
+    const exceptionPayload = buildResumePayload(exceptionResponse, approvalInterrupt);
+    expect(exceptionPayload).toEqual({ action: "approve_exception" });
+
+    // 3. Input kind with text
+    const inputInterrupt: LangGraphInterrupt = {
+      interrupt_id: "int-input-secret",
+      kind: "input",
+      prompt: "Enter cryptographic signing key",
+      options: [],
+    };
+
+    const inputResponse: PaperclipQuestionResponse = {
+      schema: "paperclip.question_response.v1",
+      answers: {
+        "int-input-secret": {
+          text: "sec-key-998877",
+        },
+      },
+    };
+
+    const inputPayload = buildResumePayload(inputResponse, inputInterrupt);
+    expect(inputPayload).toEqual({
+      action: "sec-key-998877",
+      text: "sec-key-998877",
+      value: "sec-key-998877",
+    });
+
+    // 4. Elicitation kind
+    const elicitInterrupt: LangGraphInterrupt = {
+      interrupt_id: "int-elicit-1",
+      kind: "elicitation",
+      prompt: "Select cloud region and cluster name",
+      options: [
+        { id: "us-east-1", label: "US East (N. Virginia)" },
+        { id: "sa-east-1", label: "South America (Sao Paulo)" },
+      ],
+    };
+
+    const elicitResponse: PaperclipQuestionResponse = {
+      schema: "paperclip.question_response.v1",
+      answers: {
+        "int-elicit-1": {
+          selectedOptionIds: ["sa-east-1"],
+          customText: "cluster-fenix-prod",
+        },
+      },
+    };
+
+    const elicitPayload = buildResumePayload(elicitResponse, elicitInterrupt);
+    expect(elicitPayload).toEqual({
+      action: "sa-east-1",
+      customText: "cluster-fenix-prod",
+      value: "cluster-fenix-prod",
+    });
+
+    // 5. Strict determinism check across 100 runs
+    const baseline = JSON.stringify(buildResumePayload(elicitResponse, elicitInterrupt));
+    for (let i = 0; i < 100; i++) {
+      const current = JSON.stringify(buildResumePayload(elicitResponse, elicitInterrupt));
+      expect(current).toBe(baseline);
+    }
+
+    // Key ordering must be strictly alphabetical
+    const keys = Object.keys(elicitPayload);
+    const sortedKeys = [...keys].sort();
+    expect(keys).toEqual(sortedKeys);
   });
 });

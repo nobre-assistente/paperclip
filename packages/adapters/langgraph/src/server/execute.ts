@@ -2,10 +2,12 @@ import type {
   AdapterExecutionContext,
   AdapterExecutionResult,
   AdapterRuntimeEvent,
+  PaperclipQuestionResponse,
   UsageSummary,
 } from "@paperclipai/adapter-utils";
 import type {
   JsonValue,
+  LangGraphInterrupt,
   LangGraphRunRequest,
   LangGraphRunResponse,
   LangGraphSessionParams,
@@ -13,12 +15,18 @@ import type {
 } from "../types.js";
 import { parseLangGraphAdapterConfig } from "./config.js";
 import {
+  buildResumePayload,
   extractInterrupt,
   parseLangGraphInterrupt,
   toQuestionSet,
 } from "./interrupt.js";
 
-export { extractInterrupt, parseLangGraphInterrupt, toQuestionSet };
+export {
+  buildResumePayload,
+  extractInterrupt,
+  parseLangGraphInterrupt,
+  toQuestionSet,
+};
 
 function extractUsage(runResponse: LangGraphRunResponse): UsageSummary | undefined {
   if (!runResponse.usage) return undefined;
@@ -183,6 +191,104 @@ export async function execute(
     tenantId,
   };
 
+  const rawPendingResume =
+    ctx.runtime.sessionParams?.pendingResume &&
+    typeof ctx.runtime.sessionParams.pendingResume === "object"
+      ? (ctx.runtime.sessionParams.pendingResume as { interruptId?: unknown; requestId?: unknown })
+      : null;
+  const pendingInterruptId =
+    (typeof rawPendingResume?.interruptId === "string" && rawPendingResume.interruptId.trim()) ||
+    (typeof ctx.runtime.sessionParams?.interruptId === "string" && ctx.runtime.sessionParams.interruptId.trim()) ||
+    null;
+
+  const wakeReason = typeof ctx.context.wakeReason === "string" ? ctx.context.wakeReason.trim() : "";
+  const approvalStatus = typeof ctx.context.approvalStatus === "string" ? ctx.context.approvalStatus.trim() : "";
+  const hasApprovalContext =
+    wakeReason === "approval_approved" ||
+    wakeReason === "approval_rejected" ||
+    approvalStatus === "approved" ||
+    approvalStatus === "rejected" ||
+    typeof ctx.context.approvalId === "string";
+
+  const hasExplicitResponse =
+    Boolean(ctx.context.response) ||
+    Boolean(ctx.config.response) ||
+    Boolean(ctx.context.resumePayload) ||
+    Boolean(ctx.config.resumePayload) ||
+    Boolean(ctx.context.action) ||
+    Boolean(ctx.config.action) ||
+    Boolean(ctx.context.command) ||
+    Boolean(ctx.config.command) ||
+    (Array.isArray(ctx.executionContinuation?.humanResponses) &&
+      ctx.executionContinuation.humanResponses.length > 0) ||
+    ctx.context.interactionStatus === "answered" ||
+    ctx.context.isResume === true ||
+    ctx.config.isResume === true;
+
+  const isResumeAttempt =
+    hasApprovalContext ||
+    hasExplicitResponse ||
+    (pendingInterruptId !== null && (ctx.context.resume === true || ctx.config.resume === true));
+
+  if (isResumeAttempt) {
+    if (!threadId || !pendingInterruptId) {
+      const msg =
+        "Cannot resume LangGraph run: missing or invalid resume-token (threadId and interrupt_id required)";
+      await ctx.onLog("stderr", `[langgraph] ${msg}\n`);
+      return {
+        exitCode: 1,
+        signal: null,
+        timedOut: false,
+        provider: "langgraph",
+        errorMessage: msg,
+        sessionParams: {
+          threadId: threadId ?? "",
+          assistantId: config.assistantId,
+          tenantId,
+        },
+      };
+    }
+  }
+
+  let resumePayload: Record<string, unknown> | null = null;
+  if (isResumeAttempt) {
+    const rawResponse = (ctx.context.response ?? ctx.config.response) as
+      | PaperclipQuestionResponse
+      | undefined;
+
+    if (rawResponse && typeof rawResponse === "object" && rawResponse.answers) {
+      const interruptObj: LangGraphInterrupt = (ctx.context.interrupt as LangGraphInterrupt) ?? {
+        interrupt_id: pendingInterruptId!,
+        kind: "approval",
+        prompt: "",
+        options: [],
+      };
+      resumePayload = buildResumePayload(rawResponse, interruptObj);
+    } else if (ctx.context.resumePayload || ctx.config.resumePayload) {
+      resumePayload = (ctx.context.resumePayload ?? ctx.config.resumePayload) as Record<string, unknown>;
+    } else if (
+      (ctx.context.command as { resume?: Record<string, unknown> })?.resume ||
+      (ctx.config.command as { resume?: Record<string, unknown> })?.resume
+    ) {
+      resumePayload = (
+        (ctx.context.command as { resume?: Record<string, unknown> })?.resume ??
+        (ctx.config.command as { resume?: Record<string, unknown> })?.resume
+      )!;
+    } else if (hasApprovalContext) {
+      if (wakeReason === "approval_rejected" || approvalStatus === "rejected") {
+        resumePayload = { action: "reject" };
+      } else {
+        const approvalPayload = ctx.context.approvalPayload as Record<string, unknown> | undefined;
+        const action = typeof approvalPayload?.action === "string" ? approvalPayload.action : "approve";
+        resumePayload = { action };
+      }
+    } else if (ctx.context.action || ctx.config.action) {
+      resumePayload = { action: String(ctx.context.action ?? ctx.config.action) };
+    } else {
+      resumePayload = { action: "approve" };
+    }
+  }
+
   const inputPayload: Record<string, JsonValue> = {};
   if (
     ctx.config.input &&
@@ -208,18 +314,36 @@ export async function execute(
     inputPayload.run_id = ctx.runId;
   }
 
-  const runRequest: LangGraphRunRequest = {
-    assistant_id: config.assistantId,
-    input: inputPayload,
-    config: {
-      configurable: {
-        tenant_id: tenantId,
-        company_id: tenantId,
-        agent_id: ctx.agent.id,
-        run_id: ctx.runId,
+  let runRequest: LangGraphRunRequest;
+  if (isResumeAttempt) {
+    runRequest = {
+      assistant_id: config.assistantId,
+      command: {
+        resume: resumePayload!,
       },
-    },
-  };
+      config: {
+        configurable: {
+          tenant_id: tenantId,
+          company_id: tenantId,
+          agent_id: ctx.agent.id,
+          run_id: ctx.runId,
+        },
+      },
+    };
+  } else {
+    runRequest = {
+      assistant_id: config.assistantId,
+      input: inputPayload,
+      config: {
+        configurable: {
+          tenant_id: tenantId,
+          company_id: tenantId,
+          agent_id: ctx.agent.id,
+          run_id: ctx.runId,
+        },
+      },
+    };
+  }
 
   await ctx.onMeta?.({
     adapterType: "langgraph",
@@ -227,10 +351,17 @@ export async function execute(
   });
 
   ctx.onDispatch?.();
-  await ctx.onLog(
-    "stdout",
-    `[langgraph] Executing run on thread "${threadId}" for assistant "${config.assistantId}"...\n`,
-  );
+  if (isResumeAttempt) {
+    await ctx.onLog(
+      "stdout",
+      `[langgraph] Resuming run on thread "${threadId}" with Command(resume=...) for interrupt "${pendingInterruptId}"...\n`,
+    );
+  } else {
+    await ctx.onLog(
+      "stdout",
+      `[langgraph] Executing run on thread "${threadId}" for assistant "${config.assistantId}"...\n`,
+    );
+  }
 
   let timedOut = false;
   const timeoutSignal =
@@ -391,6 +522,10 @@ export async function execute(
           assistantId: sessionParams.assistantId,
           tenantId: sessionParams.tenantId,
           interruptId: interrupt.interrupt_id,
+          pendingResume: {
+            interruptId: interrupt.interrupt_id,
+            requestId: interrupt.interrupt_id,
+          },
         },
         summary: `Paused for user interaction: ${interrupt.prompt}`,
         question,
