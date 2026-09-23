@@ -27,6 +27,7 @@ export {
   parseLangGraphInterrupt,
   toQuestionSet,
 };
+import { deriveTenantId } from "../tenant.js";
 
 function extractUsage(runResponse: LangGraphRunResponse): UsageSummary | undefined {
   if (!runResponse.usage) return undefined;
@@ -91,7 +92,20 @@ export async function execute(
   }
 
   // Tenant ID is strictly derived from agent.companyId, never from user config
-  const tenantId = ctx.agent.companyId;
+  let tenantId: string;
+  try {
+    tenantId = deriveTenantId(ctx.agent);
+  } catch (err) {
+    const errorMsg = `Failed to derive tenantId: ${err instanceof Error ? err.message : String(err)}`;
+    await ctx.onLog("stderr", `[langgraph] ${errorMsg}\n`);
+    return {
+      exitCode: 1,
+      signal: null,
+      timedOut: false,
+      provider: "langgraph",
+      errorMessage: errorMsg,
+    };
+  }
 
   // Resolve existing thread or create a new one
   let threadId: string | null = null;
@@ -118,24 +132,30 @@ export async function execute(
   }
 
   if (!threadId) {
-    const rawCtxApprovalPayload =
-      ctx.context.approvalPayload && typeof ctx.context.approvalPayload === "object"
-        ? (ctx.context.approvalPayload as Record<string, unknown>)
+    const storedTenantId =
+      typeof ctx.runtime.sessionParams?.tenantId === "string"
+        ? ctx.runtime.sessionParams.tenantId.trim()
         : null;
-    const rawResumeParams =
-      ctx.context.resumeSessionParams && typeof ctx.context.resumeSessionParams === "object"
-        ? (ctx.context.resumeSessionParams as Record<string, unknown>)
-        : null;
-    const candidateId =
-      (typeof ctx.runtime.sessionParams?.sessionId === "string" && ctx.runtime.sessionParams.sessionId.trim()) ||
-      (typeof ctx.runtime.sessionDisplayId === "string" && ctx.runtime.sessionDisplayId.trim()) ||
-      (typeof ctx.runtime.sessionId === "string" && ctx.runtime.sessionId.trim()) ||
-      (typeof ctx.context.threadId === "string" && ctx.context.threadId.trim()) ||
-      (typeof rawCtxApprovalPayload?.threadId === "string" && (rawCtxApprovalPayload.threadId as string).trim()) ||
-      (typeof rawResumeParams?.threadId === "string" && (rawResumeParams.threadId as string).trim()) ||
-      null;
-    if (candidateId) {
-      threadId = candidateId;
+    if (!storedTenantId || storedTenantId === tenantId) {
+      const rawCtxApprovalPayload =
+        ctx.context.approvalPayload && typeof ctx.context.approvalPayload === "object"
+          ? (ctx.context.approvalPayload as Record<string, unknown>)
+          : null;
+      const rawResumeParams =
+        ctx.context.resumeSessionParams && typeof ctx.context.resumeSessionParams === "object"
+          ? (ctx.context.resumeSessionParams as Record<string, unknown>)
+          : null;
+      const candidateId =
+        (typeof ctx.runtime.sessionParams?.sessionId === "string" && ctx.runtime.sessionParams.sessionId.trim()) ||
+        (typeof ctx.runtime.sessionDisplayId === "string" && ctx.runtime.sessionDisplayId.trim()) ||
+        (typeof ctx.runtime.sessionId === "string" && ctx.runtime.sessionId.trim()) ||
+        (typeof ctx.context.threadId === "string" && ctx.context.threadId.trim()) ||
+        (typeof rawCtxApprovalPayload?.threadId === "string" && (rawCtxApprovalPayload.threadId as string).trim()) ||
+        (typeof rawResumeParams?.threadId === "string" && (rawResumeParams.threadId as string).trim()) ||
+        null;
+      if (candidateId) {
+        threadId = candidateId;
+      }
     }
   }
 
@@ -145,6 +165,7 @@ export async function execute(
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-tenant-id": tenantId,
         },
         body: JSON.stringify({
           metadata: {
@@ -436,6 +457,7 @@ export async function execute(
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-tenant-id": tenantId,
         },
         body: JSON.stringify(runRequest),
         signal: runAbortSignal,
