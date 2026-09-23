@@ -44,6 +44,33 @@ export interface LangGraphRunUsage {
   cachedInputTokens?: number;
 }
 
+export type LangGraphInterruptKind = "approval" | "input" | "elicitation";
+
+export interface InterruptOption {
+  id: string;
+  label: string;
+  description?: string | null;
+}
+
+export interface LangGraphInterrupt {
+  interrupt_id: string;
+  kind: LangGraphInterruptKind;
+  prompt: string;
+  options: InterruptOption[] | readonly InterruptOption[];
+}
+
+export interface LangGraphInterruptItem {
+  value?: LangGraphInterrupt | unknown;
+  id?: string;
+  name?: string;
+}
+
+export interface LangGraphTaskItem {
+  id?: string;
+  name?: string;
+  interrupts?: Array<LangGraphInterruptItem | LangGraphInterrupt>;
+}
+
 export interface LangGraphRunResponse {
   run_id?: string;
   thread_id?: string;
@@ -54,4 +81,8 @@ export interface LangGraphRunResponse {
   message?: string;
   detail?: string | Record<string, JsonValue>;
   usage?: LangGraphRunUsage;
+  interrupts?: Array<LangGraphInterruptItem | LangGraphInterrupt>;
+  interrupt?: LangGraphInterruptItem | LangGraphInterrupt;
+  tasks?: LangGraphTaskItem[];
 }
+

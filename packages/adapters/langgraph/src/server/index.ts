@@ -5,7 +5,12 @@ import {
   models,
   agentConfigurationDoc,
 } from "../index.js";
-import { execute } from "./execute.js";
+import {
+  execute,
+  extractInterrupt,
+  parseLangGraphInterrupt,
+  toQuestionSet,
+} from "./execute.js";
 import { testEnvironment } from "./test.js";
 import { sessionCodec } from "./session.js";
 import { getConfigSchema, parseLangGraphAdapterConfig } from "./config.js";
@@ -16,6 +21,9 @@ export {
   sessionCodec,
   getConfigSchema,
   parseLangGraphAdapterConfig,
+  extractInterrupt,
+  parseLangGraphInterrupt,
+  toQuestionSet,
   type,
   label,
   models,

@@ -1,6 +1,7 @@
 import type {
   AdapterExecutionContext,
   AdapterExecutionResult,
+  AdapterRuntimeEvent,
   UsageSummary,
 } from "@paperclipai/adapter-utils";
 import type {
@@ -11,6 +12,13 @@ import type {
   LangGraphThreadResponse,
 } from "../types.js";
 import { parseLangGraphAdapterConfig } from "./config.js";
+import {
+  extractInterrupt,
+  parseLangGraphInterrupt,
+  toQuestionSet,
+} from "./interrupt.js";
+
+export { extractInterrupt, parseLangGraphInterrupt, toQuestionSet };
 
 function extractUsage(runResponse: LangGraphRunResponse): UsageSummary | undefined {
   if (!runResponse.usage) return undefined;
@@ -224,23 +232,26 @@ export async function execute(
     `[langgraph] Executing run on thread "${threadId}" for assistant "${config.assistantId}"...\n`,
   );
 
-  const abortController = new AbortController();
   let timedOut = false;
-  let timeoutTimer: NodeJS.Timeout | null = null;
-
-  if (config.runTimeoutMs > 0) {
-    timeoutTimer = setTimeout(() => {
-      timedOut = true;
-      abortController.abort();
-    }, config.runTimeoutMs);
-  }
-
-  const onAbort = () => {
-    abortController.abort();
+  const timeoutSignal =
+    config.runTimeoutMs > 0 ? AbortSignal.timeout(config.runTimeoutMs) : null;
+  const onTimeoutAbort = () => {
+    timedOut = true;
   };
-  if (ctx.signal) {
-    ctx.signal.addEventListener("abort", onAbort, { once: true });
+  if (timeoutSignal) {
+    timeoutSignal.addEventListener("abort", onTimeoutAbort, { once: true });
   }
+
+  const signals: AbortSignal[] = [];
+  if (timeoutSignal) {
+    signals.push(timeoutSignal);
+  }
+  if (ctx.signal) {
+    signals.push(ctx.signal);
+  }
+
+  const runAbortSignal =
+    signals.length > 0 ? AbortSignal.any(signals) : undefined;
 
   if (ctx.onCancellationReady) {
     await ctx.onCancellationReady();
@@ -255,7 +266,7 @@ export async function execute(
           "Content-Type": "application/json",
         },
         body: JSON.stringify(runRequest),
-        signal: abortController.signal,
+        signal: runAbortSignal,
       },
     );
 
@@ -298,6 +309,91 @@ export async function execute(
           assistantId: sessionParams.assistantId,
           tenantId: sessionParams.tenantId,
         },
+        resultJson: (runData.values as Record<string, JsonValue>) ?? null,
+      };
+    }
+
+    const interrupt = extractInterrupt(runData);
+    if (runData.status === "interrupted" || interrupt !== null) {
+      if (!interrupt) {
+        const msg =
+          "LangGraph run was interrupted but payload did not contain a valid interrupt";
+        await ctx.onLog("stderr", `[langgraph] ${msg}\n`);
+        return {
+          exitCode: 1,
+          signal: null,
+          timedOut: false,
+          provider: "langgraph",
+          errorMessage: msg,
+          sessionParams: {
+            threadId: sessionParams.threadId,
+            assistantId: sessionParams.assistantId,
+            tenantId: sessionParams.tenantId,
+          },
+        };
+      }
+
+      const questionSet = toQuestionSet(interrupt);
+      const choices = (interrupt.options ?? []).map((opt) => ({
+        key: opt.id,
+        label: opt.label,
+        ...(opt.description ? { description: opt.description } : {}),
+      }));
+
+      const question = {
+        prompt: interrupt.prompt,
+        choices,
+      };
+
+      const requestKind =
+        interrupt.kind === "approval"
+          ? "permission_approval"
+          : interrupt.kind === "input"
+            ? "user_input"
+            : "elicitation";
+      const requestType =
+        interrupt.kind === "approval" ? "permission" : "input";
+
+      await ctx.onEvent?.({
+        eventType: "runtime_request",
+        requestKind,
+        requestType,
+        status: "pending",
+        questionSet,
+        payload: {
+          requestId: interrupt.interrupt_id,
+          requestKind,
+          requestType,
+          status: "pending",
+          prompt: interrupt.prompt,
+          choices,
+          questionSet,
+        },
+      } as unknown as AdapterRuntimeEvent);
+
+      await ctx.onLog(
+        "stdout",
+        `[langgraph] Run interrupted on thread "${threadId}" requiring human interaction: ${interrupt.prompt}\n`,
+      );
+
+      const usage = extractUsage(runData);
+
+      return {
+        exitCode: 0,
+        signal: null,
+        timedOut: false,
+        provider: "langgraph",
+        usage,
+        sessionId: threadId,
+        sessionDisplayId: threadId,
+        sessionParams: {
+          threadId: sessionParams.threadId,
+          assistantId: sessionParams.assistantId,
+          tenantId: sessionParams.tenantId,
+          interruptId: interrupt.interrupt_id,
+        },
+        summary: `Paused for user interaction: ${interrupt.prompt}`,
+        question,
         resultJson: (runData.values as Record<string, JsonValue>) ?? null,
       };
     }
@@ -376,11 +472,8 @@ export async function execute(
       },
     };
   } finally {
-    if (timeoutTimer) {
-      clearTimeout(timeoutTimer);
-    }
-    if (ctx.signal) {
-      ctx.signal.removeEventListener("abort", onAbort);
+    if (timeoutSignal) {
+      timeoutSignal.removeEventListener("abort", onTimeoutAbort);
     }
   }
 }

@@ -3,8 +3,9 @@ import type {
   AdapterExecutionContext,
   AdapterExecutionResult,
 } from "@paperclipai/adapter-utils";
-import { execute } from "./execute.js";
+import { execute, extractInterrupt, toQuestionSet } from "./execute.js";
 import { testEnvironment } from "./test.js";
+import type { LangGraphInterrupt } from "../types.js";
 
 describe("execute()", () => {
   const originalFetch = globalThis.fetch;
@@ -315,7 +316,314 @@ describe("execute()", () => {
     expect(result.timedOut).toBe(true);
     expect(result.errorMessage).toContain("timed out after 50ms");
   });
+
+  it("interrupt maps to question in execute result", async () => {
+    const fetchMock = vi.fn().mockImplementation((input: string | URL | Request) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url.endsWith("/threads")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ thread_id: "thread-interrupt-1" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+
+      if (url.includes("/runs/wait")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              run_id: "run-lg-interrupt-1",
+              thread_id: "thread-interrupt-1",
+              status: "interrupted",
+              interrupts: [
+                {
+                  value: {
+                    interrupt_id: "int-confirm-deploy",
+                    kind: "approval",
+                    prompt: "Do you approve deploying to production?",
+                    options: [
+                      { id: "opt-approve", label: "Approve deploy", description: "Deploy immediately" },
+                      { id: "opt-reject", label: "Reject deploy", description: "Do not deploy" },
+                    ],
+                  },
+                },
+              ],
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response("Not found", { status: 404 }));
+    });
+
+    globalThis.fetch = fetchMock;
+
+    const ctx = createTestContext();
+    const result = await execute(ctx);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.question).toBeDefined();
+    expect(result.question).toEqual({
+      prompt: "Do you approve deploying to production?",
+      choices: [
+        { key: "opt-approve", label: "Approve deploy", description: "Deploy immediately" },
+        { key: "opt-reject", label: "Reject deploy", description: "Do not deploy" },
+      ],
+    });
+    expect(result.sessionParams?.threadId).toBe("thread-interrupt-1");
+    expect(result.sessionParams?.interruptId).toBe("int-confirm-deploy");
+    expect(result.summary).toContain("Do you approve deploying to production?");
+  });
+
+  it("runtime_request emitted on interrupt with questionSet v1 schema", async () => {
+    const onEventMock = vi.fn().mockResolvedValue(undefined);
+
+    const fetchMock = vi.fn().mockImplementation((input: string | URL | Request) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url.endsWith("/threads")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ thread_id: "thread-interrupt-2" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+
+      if (url.includes("/runs/wait")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              run_id: "run-lg-interrupt-2",
+              thread_id: "thread-interrupt-2",
+              status: "interrupted",
+              interrupt: {
+                interrupt_id: "int-runtime-req-1",
+                kind: "approval",
+                prompt: "Authorize sensitive data export?",
+                options: [
+                  { id: "yes", label: "Yes" },
+                  { id: "no", label: "No" },
+                ],
+              },
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response("Not found", { status: 404 }));
+    });
+
+    globalThis.fetch = fetchMock;
+
+    const ctx = createTestContext({
+      onEvent: onEventMock,
+    });
+    const result = await execute(ctx);
+
+    expect(result.exitCode).toBe(0);
+    expect(onEventMock).toHaveBeenCalledTimes(1);
+    const emittedEvent = onEventMock.mock.calls[0][0];
+    expect(emittedEvent).toMatchObject({
+      eventType: "runtime_request",
+      status: "pending",
+    });
+    const questionSet = emittedEvent.questionSet ?? emittedEvent.payload?.questionSet;
+    expect(questionSet).toBeDefined();
+    expect(questionSet.schema).toBe("paperclip.question_set.v1");
+    expect(questionSet.questions).toHaveLength(1);
+    expect(questionSet.questions[0].id).toBe("int-runtime-req-1");
+    expect(questionSet.questions[0].prompt).toBe("Authorize sensitive data export?");
+    expect(questionSet.questions[0].required).toBe(true);
+    expect(questionSet.questions[0].answerMode).toBe("single_select");
+    expect(questionSet.questions[0].options).toEqual([
+      { id: "yes", label: "Yes" },
+      { id: "no", label: "No" },
+    ]);
+  });
+
+  it("handles interrupted run with missing interrupt payload gracefully", async () => {
+    const fetchMock = vi.fn().mockImplementation((input: string | URL | Request) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url.endsWith("/threads")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ thread_id: "thread-missing-payload" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+
+      if (url.includes("/runs/wait")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              run_id: "run-lg-empty-interrupt",
+              thread_id: "thread-missing-payload",
+              status: "interrupted",
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response("Not found", { status: 404 }));
+    });
+
+    globalThis.fetch = fetchMock;
+
+    const ctx = createTestContext();
+    const result = await execute(ctx);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.errorMessage).toContain("not contain a valid interrupt");
+    expect(result.sessionParams?.threadId).toBe("thread-missing-payload");
+  });
 });
+
+describe("toQuestionSet() and extractInterrupt()", () => {
+  it("approval kind maps single_select in toQuestionSet", () => {
+    const approvalInterrupt: LangGraphInterrupt = {
+      interrupt_id: "int-approval-mode",
+      kind: "approval",
+      prompt: "Approve release v1.0?",
+      options: [
+        { id: "approve", label: "Approve" },
+        { id: "reject", label: "Reject" },
+      ],
+    };
+
+    const questionSet = toQuestionSet(approvalInterrupt);
+
+    expect(questionSet.schema).toBe("paperclip.question_set.v1");
+    expect(questionSet.questions).toHaveLength(1);
+    expect(questionSet.questions[0].id).toBe("int-approval-mode");
+    expect(questionSet.questions[0].prompt).toBe("Approve release v1.0?");
+    expect(questionSet.questions[0].required).toBe(true);
+    expect(questionSet.questions[0].answerMode).toBe("single_select");
+    expect(questionSet.questions[0].options).toEqual([
+      { id: "approve", label: "Approve" },
+      { id: "reject", label: "Reject" },
+    ]);
+  });
+
+  it("input kind maps to text mode without options", () => {
+    const inputInterrupt: LangGraphInterrupt = {
+      interrupt_id: "int-text-input",
+      kind: "input",
+      prompt: "Please provide your API secret token",
+      options: [],
+    };
+
+    const questionSet = toQuestionSet(inputInterrupt);
+
+    expect(questionSet.schema).toBe("paperclip.question_set.v1");
+    expect(questionSet.questions).toHaveLength(1);
+    expect(questionSet.questions[0].id).toBe("int-text-input");
+    expect(questionSet.questions[0].prompt).toBe("Please provide your API secret token");
+    expect(questionSet.questions[0].required).toBe(true);
+    expect(questionSet.questions[0].answerMode).toBe("text");
+    expect(questionSet.questions[0].options).toBeUndefined();
+  });
+
+  it("elicitation kind maps to single_select with options and text without options", () => {
+    const elicitationWithOptions: LangGraphInterrupt = {
+      interrupt_id: "int-elicit-1",
+      kind: "elicitation",
+      prompt: "Select target cloud environment",
+      options: [
+        { id: "aws", label: "Amazon Web Services" },
+        { id: "gcp", label: "Google Cloud Platform" },
+      ],
+    };
+
+    const qSetWithOptions = toQuestionSet(elicitationWithOptions);
+    expect(qSetWithOptions.questions[0].answerMode).toBe("single_select");
+    expect(qSetWithOptions.questions[0].options).toHaveLength(2);
+
+    const elicitationWithoutOptions: LangGraphInterrupt = {
+      interrupt_id: "int-elicit-2",
+      kind: "elicitation",
+      prompt: "Specify the database connection string",
+      options: [],
+    };
+
+    const qSetWithoutOptions = toQuestionSet(elicitationWithoutOptions);
+    expect(qSetWithoutOptions.questions[0].answerMode).toBe("text");
+    expect(qSetWithoutOptions.questions[0].options).toBeUndefined();
+  });
+
+  it("strictly preserves payload options and never invents options", () => {
+    const singleOptionInterrupt: LangGraphInterrupt = {
+      interrupt_id: "int-exact-opts",
+      kind: "approval",
+      prompt: "Confirm one-way wipe?",
+      options: [
+        { id: "proceed", label: "Proceed with wipe", description: "Irreversible operation" },
+      ],
+    };
+
+    const qSet = toQuestionSet(singleOptionInterrupt);
+    expect(qSet.questions[0].options).toHaveLength(1);
+    expect(qSet.questions[0].options?.[0]).toEqual({
+      id: "proceed",
+      label: "Proceed with wipe",
+      description: "Irreversible operation",
+    });
+    // Confirm no invented default options (like cancel or reject)
+    expect(qSet.questions[0].options?.some((o) => o.id === "cancel" || o.id === "reject")).toBe(false);
+  });
+
+  it("extracts interrupt from tasks structure", () => {
+    const responseWithTasks = {
+      run_id: "run-tasks-1",
+      thread_id: "thread-tasks",
+      status: "interrupted",
+      tasks: [
+        {
+          id: "task-sub-1",
+          interrupts: [
+            {
+              value: {
+                interrupt_id: "int-task-nested",
+                kind: "approval" as const,
+                prompt: "Approval in nested graph task",
+                options: [{ id: "ok", label: "OK" }],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const extracted = extractInterrupt(responseWithTasks);
+    expect(extracted).not.toBeNull();
+    expect(extracted?.interrupt_id).toBe("int-task-nested");
+    expect(extracted?.kind).toBe("approval");
+    expect(extracted?.prompt).toBe("Approval in nested graph task");
+    expect(extracted?.options).toEqual([{ id: "ok", label: "OK" }]);
+  });
+
+  it("extractInterrupt returns null for non-interrupt runs", () => {
+    expect(extractInterrupt({ status: "success", values: { summary: "Done" } })).toBeNull();
+    expect(extractInterrupt({ status: "error", error: "Failed" })).toBeNull();
+  });
+});
+
 
 describe("testEnvironment()", () => {
   const originalFetch = globalThis.fetch;
