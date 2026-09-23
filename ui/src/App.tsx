@@ -28,6 +28,7 @@ import { DashboardLive } from "./pages/DashboardLive";
 import { Timeline } from "./pages/Timeline";
 import { Companies } from "./pages/Companies";
 import { AGENT_FILTER_TABS, Agents } from "./pages/Agents";
+import { Canvas } from "./pages/Canvas";
 import { AgentDetail } from "./pages/AgentDetail";
 import { Projects } from "./pages/Projects";
 import { ProjectDetail } from "./pages/ProjectDetail";
@@ -270,6 +271,9 @@ function boardRoutes(streamlinedUiEnabled: boolean) {
         path="org"
         element={streamlinedUiEnabled ? <Navigate to="/agents/all" replace /> : <ProductionSurface><ProductionOrgChart /></ProductionSurface>}
       />
+      {/* Route: /canvas */}
+      <Route path="canvas" element={<Canvas />} />
+      <Route path="canvas/:assistantId" element={<Canvas />} />
       <Route path="agents" element={<Navigate to="/agents/all" replace />} />
       {AGENT_FILTER_TABS.map((tab) => (
         <Route
@@ -806,6 +810,9 @@ export function App() {
           <Route path="skills/*" element={<UnprefixedBoardRedirect />} />
           <Route path="settings" element={<LegacySettingsRedirect />} />
           <Route path="settings/*" element={<LegacySettingsRedirect />} />
+          {/* Route: /canvas */}
+          <Route path="canvas" element={<UnprefixedBoardRedirect />} />
+          <Route path="canvas/:assistantId" element={<UnprefixedBoardRedirect />} />
           <Route path="agents" element={<UnprefixedBoardRedirect />} />
           {AGENT_FILTER_TABS.map((tab) => (
             <Route key={tab} path={`agents/${tab}`} element={<UnprefixedBoardRedirect />} />
