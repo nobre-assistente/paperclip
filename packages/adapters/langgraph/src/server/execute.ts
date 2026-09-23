@@ -118,10 +118,21 @@ export async function execute(
   }
 
   if (!threadId) {
+    const rawCtxApprovalPayload =
+      ctx.context.approvalPayload && typeof ctx.context.approvalPayload === "object"
+        ? (ctx.context.approvalPayload as Record<string, unknown>)
+        : null;
+    const rawResumeParams =
+      ctx.context.resumeSessionParams && typeof ctx.context.resumeSessionParams === "object"
+        ? (ctx.context.resumeSessionParams as Record<string, unknown>)
+        : null;
     const candidateId =
       (typeof ctx.runtime.sessionParams?.sessionId === "string" && ctx.runtime.sessionParams.sessionId.trim()) ||
       (typeof ctx.runtime.sessionDisplayId === "string" && ctx.runtime.sessionDisplayId.trim()) ||
       (typeof ctx.runtime.sessionId === "string" && ctx.runtime.sessionId.trim()) ||
+      (typeof ctx.context.threadId === "string" && ctx.context.threadId.trim()) ||
+      (typeof rawCtxApprovalPayload?.threadId === "string" && (rawCtxApprovalPayload.threadId as string).trim()) ||
+      (typeof rawResumeParams?.threadId === "string" && (rawResumeParams.threadId as string).trim()) ||
       null;
     if (candidateId) {
       threadId = candidateId;
@@ -191,16 +202,30 @@ export async function execute(
     tenantId,
   };
 
-  const rawPendingResume =
-    ctx.runtime.sessionParams?.pendingResume &&
-    typeof ctx.runtime.sessionParams.pendingResume === "object"
-      ? (ctx.runtime.sessionParams.pendingResume as { interruptId?: unknown; requestId?: unknown })
+  const rawApprovalPayload =
+    ctx.context.approvalPayload && typeof ctx.context.approvalPayload === "object"
+      ? (ctx.context.approvalPayload as Record<string, unknown>)
       : null;
+  const rawContextResumeParams =
+    ctx.context.resumeSessionParams && typeof ctx.context.resumeSessionParams === "object"
+      ? (ctx.context.resumeSessionParams as Record<string, unknown>)
+      : null;
+  const rawPendingResume: { interruptId?: unknown; requestId?: unknown } | null =
+    (ctx.runtime.sessionParams?.pendingResume &&
+      typeof ctx.runtime.sessionParams.pendingResume === "object"
+      ? (ctx.runtime.sessionParams.pendingResume as { interruptId?: unknown; requestId?: unknown })
+      : null) ??
+    (rawContextResumeParams?.pendingResume &&
+      typeof rawContextResumeParams.pendingResume === "object"
+      ? (rawContextResumeParams.pendingResume as { interruptId?: unknown; requestId?: unknown })
+      : null);
   const pendingInterruptId =
     (typeof rawPendingResume?.interruptId === "string" && rawPendingResume.interruptId.trim()) ||
     (typeof ctx.runtime.sessionParams?.interruptId === "string" && ctx.runtime.sessionParams.interruptId.trim()) ||
+    (typeof ctx.context.interruptId === "string" && ctx.context.interruptId.trim()) ||
+    (typeof rawApprovalPayload?.interruptId === "string" && (rawApprovalPayload.interruptId as string).trim()) ||
+    (typeof rawContextResumeParams?.interruptId === "string" && (rawContextResumeParams.interruptId as string).trim()) ||
     null;
-
   const wakeReason = typeof ctx.context.wakeReason === "string" ? ctx.context.wakeReason.trim() : "";
   const approvalStatus = typeof ctx.context.approvalStatus === "string" ? ctx.context.approvalStatus.trim() : "";
   const hasApprovalContext =
@@ -314,6 +339,36 @@ export async function execute(
     inputPayload.run_id = ctx.runId;
   }
 
+  const requestContext: Record<string, JsonValue> = {
+    ...(ctx.config.context && typeof ctx.config.context === "object" && !Array.isArray(ctx.config.context)
+      ? (ctx.config.context as Record<string, JsonValue>)
+      : {}),
+    tenant_id: tenantId,
+    company_id: tenantId,
+    agent_id: ctx.agent.id,
+    project_id:
+      ((ctx.config.context as Record<string, JsonValue>)?.project_id as string) ??
+      ((ctx.config.input as Record<string, JsonValue>)?.project_id as string) ??
+      tenantId,
+    principal_id:
+      ((ctx.config.context as Record<string, JsonValue>)?.principal_id as string) ??
+      ctx.agent.id,
+    ...(ctx.runId ? { run_id: ctx.runId } : {}),
+  };
+
+  if (!inputPayload.tenant_id) {
+    inputPayload.tenant_id = tenantId;
+  }
+  if (!inputPayload.project_id) {
+    inputPayload.project_id = (requestContext.project_id as string) ?? tenantId;
+  }
+  if (!inputPayload.run_id && ctx.runId) {
+    inputPayload.run_id = ctx.runId;
+  }
+  if (!inputPayload.thread_id) {
+    inputPayload.thread_id = `${tenantId}:${inputPayload.project_id}:${ctx.runId ?? threadId}`;
+  }
+
   let runRequest: LangGraphRunRequest;
   if (isResumeAttempt) {
     runRequest = {
@@ -321,27 +376,13 @@ export async function execute(
       command: {
         resume: resumePayload!,
       },
-      config: {
-        configurable: {
-          tenant_id: tenantId,
-          company_id: tenantId,
-          agent_id: ctx.agent.id,
-          run_id: ctx.runId,
-        },
-      },
+      context: requestContext,
     };
   } else {
     runRequest = {
       assistant_id: config.assistantId,
       input: inputPayload,
-      config: {
-        configurable: {
-          tenant_id: tenantId,
-          company_id: tenantId,
-          agent_id: ctx.agent.id,
-          run_id: ctx.runId,
-        },
-      },
+      context: requestContext,
     };
   }
 
@@ -445,7 +486,7 @@ export async function execute(
     }
 
     const interrupt = extractInterrupt(runData);
-    if (runData.status === "interrupted" || interrupt !== null) {
+    if (runData.status === "interrupted" || runData.status === "human_review" || interrupt !== null) {
       if (!interrupt) {
         const msg =
           "LangGraph run was interrupted but payload did not contain a valid interrupt";

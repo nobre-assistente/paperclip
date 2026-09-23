@@ -66,10 +66,10 @@ export default defineConfig({
     url: `${BASE_URL}/api/health`,
     // Always boot a dedicated throwaway instance for e2e so browser tests
     // never attach to the developer's active Paperclip home/server.
-    reuseExistingServer: false,
+    reuseExistingServer: process.env.PAPERCLIP_E2E_REUSE_SERVER === "true",
     timeout: 120_000,
-    stdout: "pipe",
-    stderr: "pipe",
+    stdout: process.env.PAPERCLIP_E2E_PIPE_STDOUT === "true" ? "pipe" : "ignore",
+    stderr: process.env.PAPERCLIP_E2E_PIPE_STDERR === "true" ? "pipe" : "ignore",
     env: {
       ...process.env,
       NODE_ENV: "test",

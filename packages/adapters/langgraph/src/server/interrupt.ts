@@ -32,33 +32,107 @@ function parseInterruptOption(value: unknown): InterruptOption | null {
 
 export function parseLangGraphInterrupt(value: unknown): LangGraphInterrupt | null {
   if (!isRecord(value)) return null;
-  if (typeof value.interrupt_id !== "string" || value.interrupt_id.trim().length === 0) {
-    return null;
-  }
+
+  // 1. Standard Paperclip format: { interrupt_id, kind, prompt, options }
   if (
-    value.kind !== "approval" &&
-    value.kind !== "input" &&
-    value.kind !== "elicitation"
+    typeof value.interrupt_id === "string" &&
+    value.interrupt_id.trim().length > 0 &&
+    (value.kind === "approval" || value.kind === "input" || value.kind === "elicitation") &&
+    typeof value.prompt === "string"
   ) {
-    return null;
-  }
-  if (typeof value.prompt !== "string") return null;
-
-  const rawOptions = Array.isArray(value.options) ? value.options : [];
-  const options: InterruptOption[] = [];
-  for (const opt of rawOptions) {
-    const parsed = parseInterruptOption(opt);
-    if (parsed) {
-      options.push(parsed);
+    const rawOptions = Array.isArray(value.options) ? value.options : [];
+    const options: InterruptOption[] = [];
+    for (const opt of rawOptions) {
+      const parsed = parseInterruptOption(opt);
+      if (parsed) {
+        options.push(parsed);
+      }
     }
+    return {
+      interrupt_id: value.interrupt_id.trim(),
+      kind: value.kind,
+      prompt: value.prompt,
+      options,
+    };
   }
 
-  return {
-    interrupt_id: value.interrupt_id.trim(),
-    kind: value.kind,
-    prompt: value.prompt,
-    options,
-  };
+  // 2. LangGraph native interrupt format: { id, value: { ... } }
+  if (typeof value.id === "string" && isRecord(value.value)) {
+    const inner = value.value as Record<string, unknown>;
+    const interruptId = value.id.trim();
+    const prompt =
+      typeof inner.prompt === "string"
+        ? inner.prompt
+        : typeof inner.message === "string"
+          ? inner.message
+          : typeof inner.type === "string"
+            ? `Human approval required: ${inner.type}`
+            : "Approval required";
+
+    const allowedActions = Array.isArray(inner.allowed_actions)
+      ? inner.allowed_actions.map(String)
+      : [];
+
+    const options: InterruptOption[] =
+      allowedActions.length > 0
+        ? allowedActions.map((action) => ({ id: action, label: action }))
+        : Array.isArray(inner.options)
+          ? (inner.options as unknown[]).map(parseInterruptOption).filter((o): o is InterruptOption => o !== null)
+          : [
+              { id: "approve", label: "Approve" },
+              { id: "reject", label: "Reject" },
+            ];
+
+    return {
+      interrupt_id: interruptId,
+      kind: "approval",
+      prompt,
+      options,
+    };
+  }
+
+  // 3. Unwrapped native interrupt format: { type: "...", allowed_actions: [...] }
+  if (
+    typeof value.type === "string" &&
+    (Array.isArray(value.allowed_actions) || typeof value.run_id === "string")
+  ) {
+    const interruptId =
+      typeof value.interrupt_id === "string"
+        ? value.interrupt_id.trim()
+        : typeof value.id === "string"
+          ? value.id.trim()
+          : typeof value.run_id === "string"
+            ? String(value.run_id)
+            : "interrupt-" + Date.now();
+
+    const prompt =
+      typeof value.prompt === "string"
+        ? value.prompt
+        : typeof value.message === "string"
+          ? value.message
+          : `Human approval required: ${value.type}`;
+
+    const allowedActions = Array.isArray(value.allowed_actions)
+      ? value.allowed_actions.map(String)
+      : [];
+
+    const options: InterruptOption[] =
+      allowedActions.length > 0
+        ? allowedActions.map((action) => ({ id: action, label: action }))
+        : [
+            { id: "approve", label: "Approve" },
+            { id: "reject", label: "Reject" },
+          ];
+
+    return {
+      interrupt_id: interruptId,
+      kind: "approval",
+      prompt,
+      options,
+    };
+  }
+
+  return null;
 }
 
 export function toQuestionSet(i: LangGraphInterrupt): PaperclipQuestionSet {
@@ -164,6 +238,23 @@ export function extractInterrupt(
             const pv = parseLangGraphInterrupt(item.value);
             if (pv) return pv;
           }
+        }
+      }
+    }
+  }
+
+  // 5. Root __interrupt__ property directly on runResponse
+  const rawRoot = runResponse as unknown as Record<string, unknown>;
+  if (rawRoot.__interrupt__) {
+    const directParsed = parseLangGraphInterrupt(rawRoot.__interrupt__);
+    if (directParsed) return directParsed;
+    if (Array.isArray(rawRoot.__interrupt__)) {
+      for (const item of rawRoot.__interrupt__) {
+        const p = parseLangGraphInterrupt(item);
+        if (p) return p;
+        if (isRecord(item) && "value" in item) {
+          const pv = parseLangGraphInterrupt(item.value);
+          if (pv) return pv;
         }
       }
     }

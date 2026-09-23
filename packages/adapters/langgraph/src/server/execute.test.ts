@@ -216,6 +216,10 @@ describe("execute()", () => {
         baseUrl: "http://127.0.0.1:2024",
         assistantId: "assistant-graph-1",
         tenantId: "malicious-user-injected-tenant",
+        context: {
+          tenant_id: "malicious-user-injected-tenant",
+          company_id: "malicious-user-injected-tenant",
+        },
       },
     });
 
@@ -225,10 +229,12 @@ describe("execute()", () => {
     expect(result.sessionParams?.tenantId).not.toBe("malicious-user-injected-tenant");
 
     const parsedBody = JSON.parse(capturedBody) as {
+      context?: { tenant_id?: string; company_id?: string };
       config?: { configurable?: { tenant_id?: string; company_id?: string } };
     };
-    expect(parsedBody.config?.configurable?.tenant_id).toBe("company-real-tenant");
-    expect(parsedBody.config?.configurable?.company_id).toBe("company-real-tenant");
+    expect(parsedBody.context?.tenant_id).toBe("company-real-tenant");
+    expect(parsedBody.context?.company_id).toBe("company-real-tenant");
+    expect(parsedBody.config).toBeUndefined();
   });
 
   it("fails gracefully when assistantId is missing", async () => {

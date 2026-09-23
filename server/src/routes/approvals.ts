@@ -330,6 +330,22 @@ export function approvalRoutes(
       let primaryReviewPathWakeCovered = false;
       if (approval.requestedByAgentId) {
         try {
+          const rawApprovalPayload = (approval.payload && typeof approval.payload === "object" && !Array.isArray(approval.payload))
+            ? (approval.payload as Record<string, unknown>)
+            : {};
+          const approvalInterruptId = typeof rawApprovalPayload.interruptId === "string" ? rawApprovalPayload.interruptId : undefined;
+          const approvalThreadId = typeof rawApprovalPayload.threadId === "string" ? rawApprovalPayload.threadId : undefined;
+
+          const approvalResumeParams = (approvalThreadId || approvalInterruptId) ? {
+            threadId: approvalThreadId,
+            sessionId: approvalThreadId,
+            interruptId: approvalInterruptId,
+            pendingResume: approvalInterruptId ? {
+              interruptId: approvalInterruptId,
+              requestId: approvalInterruptId,
+            } : undefined,
+          } : undefined;
+
           const wakeRun = await heartbeat.wakeup(approval.requestedByAgentId, {
             source: "automation",
             triggerDetail: "system",
@@ -337,6 +353,10 @@ export function approvalRoutes(
             payload: {
               approvalId: approval.id,
               approvalStatus: approval.status,
+              approvalPayload: rawApprovalPayload,
+              ...(approvalInterruptId ? { interruptId: approvalInterruptId } : {}),
+              ...(approvalThreadId ? { threadId: approvalThreadId } : {}),
+              ...(approvalResumeParams ? { resumeSessionParams: approvalResumeParams, resumeSessionDisplayId: approvalThreadId } : {}),
               issueId: primaryIssueId,
               issueIds: linkedIssueIds,
               ...(primaryReviewPathContext ?? {}),
@@ -347,6 +367,10 @@ export function approvalRoutes(
               source: "approval.approved",
               approvalId: approval.id,
               approvalStatus: approval.status,
+              approvalPayload: rawApprovalPayload,
+              ...(approvalInterruptId ? { interruptId: approvalInterruptId } : {}),
+              ...(approvalThreadId ? { threadId: approvalThreadId } : {}),
+              ...(approvalResumeParams ? { resumeSessionParams: approvalResumeParams, resumeSessionDisplayId: approvalThreadId } : {}),
               issueId: primaryIssueId,
               issueIds: linkedIssueIds,
               taskId: primaryIssueId,

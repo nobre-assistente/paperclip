@@ -25,7 +25,7 @@ export interface LangGraphSessionParams {
 }
 
 export interface LangGraphRunConfig {
-  configurable: Record<string, JsonValue>;
+  configurable?: Record<string, JsonValue>;
 }
 
 export interface LangGraphResumeCommand {
@@ -36,7 +36,8 @@ export interface LangGraphRunRequest {
   assistant_id: string;
   input?: Record<string, JsonValue>;
   command?: LangGraphResumeCommand;
-  config: LangGraphRunConfig;
+  config?: LangGraphRunConfig;
+  context?: Record<string, JsonValue>;
 }
 
 export interface LangGraphThreadResponse {
@@ -95,6 +96,7 @@ export interface LangGraphRunResponse {
   usage?: LangGraphRunUsage;
   interrupts?: Array<LangGraphInterruptItem | LangGraphInterrupt>;
   interrupt?: LangGraphInterruptItem | LangGraphInterrupt;
+  __interrupt__?: Array<LangGraphInterruptItem | LangGraphInterrupt>;
   tasks?: LangGraphTaskItem[];
 }
 

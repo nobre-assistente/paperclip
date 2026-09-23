@@ -77,7 +77,7 @@ describe("LangGraph Topology Decoder", () => {
     expect(() => decodeLangGraphTopology({ nodes: [], edges: [{ source: "a" }] })).toThrow(
       'Invalid edge at index 0: "target" must be a string',
     );
-    expect(() => decodeLangGraphTopology({ nodes: [], edges: [{ source: "a", target: "b" }] })).toThrow(
+    expect(() => decodeLangGraphTopology({ nodes: [], edges: [{ source: "a", target: "b", conditional: "not_a_boolean" }] })).toThrow(
       'Invalid edge at index 0: "conditional" must be a boolean',
     );
     expect(() => decodeLangGraphTopology({ nodes: [], edges: [{ source: 1, target: "b", conditional: false }] })).toThrow(
@@ -102,19 +102,24 @@ describe("LangGraph Topology Decoder", () => {
       nodes: [
         { id: "__start__", type: "start", data: {} },
         { id: "planner", type: "agent", data: { role: "Planner", maxRetries: 3 } },
-        { id: "__end__", type: "end", data: {} },
+        { id: "gate", type: "runnable", data: { name: "gate" }, metadata: { defer: true } },
+        { id: "__end__" },
       ],
       edges: [
-        { source: "__start__", target: "planner", conditional: false },
+        { source: "__start__", target: "planner" },
         { source: "planner", target: "__end__", conditional: true },
       ],
     };
 
     const topology = decodeLangGraphTopology(valid);
-    expect(topology.nodes).toHaveLength(3);
+    expect(topology.nodes).toHaveLength(4);
     expect(topology.edges).toHaveLength(2);
     expect(topology.nodes[0].id).toBe("__start__");
     expect(topology.nodes[1].data.role).toBe("Planner");
+    expect(topology.nodes[2].metadata).toEqual({ defer: true });
+    expect(topology.nodes[3].id).toBe("__end__");
+    expect(topology.nodes[3].type).toBe("end");
+    expect(topology.nodes[3].data).toEqual({});
     expect(topology.edges[1].conditional).toBe(true);
   });
 });

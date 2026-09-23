@@ -119,4 +119,30 @@ describe("toReactFlow", () => {
     const outgoing = detail.fields.find((f) => f.label === "Outgoing Connections");
     expect(outgoing?.value).toContain("decider");
   });
+  it("handles cyclic graphs with repair loops safely", () => {
+    const cyclicTopology = {
+      nodes: [
+        { id: "__start__", type: "start", data: {} },
+        { id: "worker", type: "agent", data: {} },
+        { id: "evaluator", type: "conditional", data: {} },
+        { id: "repair", type: "agent", data: {} },
+        { id: "__end__", type: "end", data: {} },
+      ],
+      edges: [
+        { source: "__start__", target: "worker", conditional: false },
+        { source: "worker", target: "evaluator", conditional: false },
+        { source: "evaluator", target: "repair", conditional: true },
+        { source: "repair", target: "worker", conditional: false }, // Cycle back to worker!
+        { source: "evaluator", target: "__end__", conditional: true },
+      ],
+    };
+
+    const { nodes, edges } = toReactFlow(cyclicTopology);
+    expect(nodes).toHaveLength(5);
+    expect(edges).toHaveLength(5);
+    for (const node of nodes) {
+      expect(node.position.x).toBeTypeOf("number");
+      expect(node.position.y).toBeTypeOf("number");
+    }
+  });
 });

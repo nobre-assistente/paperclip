@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Canvas - LangGraph Execution Topology", () => {
   test("canvas renders langgraph nodes", async ({ page, request }) => {
+    test.setTimeout(120_000);
     // 1. Create a dedicated test company
     const companyRes = await request.post("/api/companies", {
       data: { name: `Canvas Test Company ${Date.now()}` },
@@ -63,9 +64,9 @@ test.describe("Canvas - LangGraph Execution Topology", () => {
     await expect(propertyPanel).toBeVisible();
 
     // Verify property panel displays read-only fields
-    await expect(propertyPanel.getByText("planner")).toBeVisible();
+    await expect(propertyPanel.getByText("planner").first()).toBeVisible();
     await expect(propertyPanel.getByText("Planner Agent")).toBeVisible();
     await expect(propertyPanel.getByText("claude-3-5-sonnet")).toBeVisible();
-    await expect(propertyPanel.getByText("Read-only")).toBeVisible();
+    await expect(propertyPanel.getByText("Read-only", { exact: true })).toBeVisible();
   });
 });

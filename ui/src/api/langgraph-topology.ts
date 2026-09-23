@@ -5,6 +5,7 @@ export interface LangGraphNode {
   id: string;
   type: string;
   data: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
@@ -28,7 +29,7 @@ function decodeNode(rawNode: unknown, index: number): LangGraphNode {
     throw new Error(`Invalid node at index ${index}: expected a plain object`);
   }
 
-  const allowedKeys = new Set(["id", "type", "data"]);
+  const allowedKeys = new Set(["id", "type", "data", "metadata"]);
   for (const key of Object.keys(rawNode)) {
     if (!allowedKeys.has(key)) {
       throw new Error(`Invalid node at index ${index}: unexpected property "${key}"`);
@@ -39,18 +40,39 @@ function decodeNode(rawNode: unknown, index: number): LangGraphNode {
     throw new Error(`Invalid node at index ${index}: "id" must be a string`);
   }
 
-  if (typeof rawNode.type !== "string") {
+  const type =
+    typeof rawNode.type === "string"
+      ? rawNode.type
+      : rawNode.id === "__end__"
+        ? "end"
+        : rawNode.id === "__start__"
+          ? "start"
+          : null;
+
+  if (type === null) {
     throw new Error(`Invalid node at index ${index}: "type" must be a string`);
   }
 
-  if (!isPlainObject(rawNode.data)) {
+  const data =
+    rawNode.data !== undefined && rawNode.data !== null
+      ? rawNode.data
+      : (rawNode.id === "__end__" || rawNode.id === "__start__")
+        ? {}
+        : null;
+
+  if (!isPlainObject(data)) {
     throw new Error(`Invalid node at index ${index}: "data" must be a non-null object`);
+  }
+
+  if (rawNode.metadata !== undefined && !isPlainObject(rawNode.metadata)) {
+    throw new Error(`Invalid node at index ${index}: "metadata" must be a non-null object`);
   }
 
   return {
     id: rawNode.id,
-    type: rawNode.type,
-    data: rawNode.data,
+    type,
+    data,
+    ...(rawNode.metadata !== undefined ? { metadata: rawNode.metadata as Record<string, unknown> } : {}),
   };
 }
 
@@ -74,14 +96,14 @@ function decodeEdge(rawEdge: unknown, index: number): LangGraphEdge {
     throw new Error(`Invalid edge at index ${index}: "target" must be a string`);
   }
 
-  if (typeof rawEdge.conditional !== "boolean") {
+  if (rawEdge.conditional !== undefined && typeof rawEdge.conditional !== "boolean") {
     throw new Error(`Invalid edge at index ${index}: "conditional" must be a boolean`);
   }
 
   return {
     source: rawEdge.source,
     target: rawEdge.target,
-    conditional: rawEdge.conditional,
+    conditional: Boolean(rawEdge.conditional),
   };
 }
 

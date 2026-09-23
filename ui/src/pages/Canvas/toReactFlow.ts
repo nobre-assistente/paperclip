@@ -93,15 +93,21 @@ export function toReactFlow(topology: LangGraphTopology): {
     queue.push(lgNodes[0].id);
   }
 
+  const visitCounts = new Map<string, number>();
+
   while (queue.length > 0) {
     const curr = queue.shift()!;
     const currLevel = levels.get(curr) ?? 0;
     const neighbors = adj.get(curr) ?? [];
     for (const next of neighbors) {
-      const nextLevel = Math.max(levels.get(next) ?? 0, currLevel + 1);
-      if (!levels.has(next) || levels.get(next)! < nextLevel) {
-        levels.set(next, nextLevel);
-        queue.push(next);
+      const nextLevel = currLevel + 1;
+      const count = visitCounts.get(next) ?? 0;
+      if (nextLevel < lgNodes.length && count < (inDegree.get(next) ?? 1)) {
+        if (!levels.has(next) || levels.get(next)! < nextLevel) {
+          levels.set(next, nextLevel);
+          visitCounts.set(next, count + 1);
+          queue.push(next);
+        }
       }
     }
   }
