@@ -15,6 +15,7 @@ import {
 import { testEnvironment } from "./test.js";
 import { sessionCodec } from "./session.js";
 import { getConfigSchema, parseLangGraphAdapterConfig } from "./config.js";
+import { deriveTenantId } from "../tenant.js";
 
 export {
   execute,
@@ -26,6 +27,7 @@ export {
   parseLangGraphInterrupt,
   toQuestionSet,
   buildResumePayload,
+  deriveTenantId,
   type,
   label,
   models,

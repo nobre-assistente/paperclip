@@ -175,13 +175,16 @@ describe("execute()", () => {
     expect(executedUrls.some((u) => u.includes("/runs/wait"))).toBe(true);
   });
 
-  it("never derives tenantId from user config", async () => {
+  it("tenantId derived only from companyId", async () => {
     let capturedBody = "";
+    let capturedCreateHeaders: Record<string, string> = {};
+    let capturedRunHeaders: Record<string, string> = {};
 
     const fetchMock = vi.fn().mockImplementation((input: string | URL | Request, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
 
       if (url.endsWith("/threads")) {
+        capturedCreateHeaders = (init?.headers as Record<string, string>) || {};
         return Promise.resolve(
           new Response(JSON.stringify({ thread_id: "thread-safe-tenant" }), {
             status: 200,
@@ -191,6 +194,7 @@ describe("execute()", () => {
       }
 
       if (url.includes("/runs/wait")) {
+        capturedRunHeaders = (init?.headers as Record<string, string>) || {};
         capturedBody = typeof init?.body === "string" ? init.body : "";
         return Promise.resolve(
           new Response(
@@ -212,6 +216,15 @@ describe("execute()", () => {
     globalThis.fetch = fetchMock;
 
     const ctx = createTestContext({
+      agent: {
+        id: "agent-1",
+        companyId: "company-real-tenant",
+        name: "Test Agent",
+        adapterType: "langgraph",
+        adapterConfig: {
+          tenantId: "malicious-user-injected-tenant-in-adapter-config",
+        },
+      },
       config: {
         baseUrl: "http://127.0.0.1:2024",
         assistantId: "assistant-graph-1",
@@ -220,13 +233,22 @@ describe("execute()", () => {
           tenant_id: "malicious-user-injected-tenant",
           company_id: "malicious-user-injected-tenant",
         },
+        input: {
+          tenantId: "malicious-injected-input-tenant",
+        },
       },
     });
 
     const result = await execute(ctx);
 
+    expect(result.exitCode).toBe(0);
     expect(result.sessionParams?.tenantId).toBe("company-real-tenant");
     expect(result.sessionParams?.tenantId).not.toBe("malicious-user-injected-tenant");
+    expect(result.sessionParams?.tenantId).not.toBe("malicious-user-injected-tenant-in-adapter-config");
+
+    // Headers must carry strictly companyId as x-tenant-id
+    expect(capturedCreateHeaders["x-tenant-id"]).toBe("company-real-tenant");
+    expect(capturedRunHeaders["x-tenant-id"]).toBe("company-real-tenant");
 
     const parsedBody = JSON.parse(capturedBody) as {
       context?: { tenant_id?: string; company_id?: string };
@@ -235,6 +257,87 @@ describe("execute()", () => {
     expect(parsedBody.context?.tenant_id).toBe("company-real-tenant");
     expect(parsedBody.context?.company_id).toBe("company-real-tenant");
     expect(parsedBody.config).toBeUndefined();
+  });
+
+  it("does not reuse existing thread across different tenants", async () => {
+    let createdNewThread = false;
+
+    const fetchMock = vi.fn().mockImplementation((input: string | URL | Request) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url.endsWith("/threads")) {
+        createdNewThread = true;
+        return Promise.resolve(
+          new Response(JSON.stringify({ thread_id: "thread-new-tenant" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+
+      if (url.includes("/runs/wait")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              status: "success",
+              values: { summary: "New thread created for different tenant." },
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response("Not found", { status: 404 }));
+    });
+
+    globalThis.fetch = fetchMock;
+
+    const ctx = createTestContext({
+      agent: {
+        id: "agent-1",
+        companyId: "company-b",
+        name: "Tenant B Agent",
+        adapterType: "langgraph",
+        adapterConfig: {},
+      },
+      runtime: {
+        sessionId: "thread-tenant-a",
+        sessionDisplayId: "thread-tenant-a",
+        taskKey: null,
+        sessionParams: {
+          threadId: "thread-tenant-a",
+          assistantId: "assistant-graph-1",
+          tenantId: "company-a",
+        },
+      },
+    });
+
+    const result = await execute(ctx);
+
+    expect(result.exitCode).toBe(0);
+    expect(createdNewThread).toBe(true);
+    expect(result.sessionParams?.threadId).toBe("thread-new-tenant");
+    expect(result.sessionParams?.tenantId).toBe("company-b");
+  });
+
+  it("fails execution cleanly when agent.companyId is missing or empty", async () => {
+    const ctx = createTestContext({
+      agent: {
+        id: "agent-1",
+        companyId: "",
+        name: "Invalid Agent",
+        adapterType: "langgraph",
+        adapterConfig: {},
+      },
+    });
+
+    const result = await execute(ctx);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.errorMessage).toContain("companyId");
   });
 
   it("fails gracefully when assistantId is missing", async () => {
