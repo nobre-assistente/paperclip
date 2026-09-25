@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import { createRequire } from "node:module";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -9,8 +8,6 @@ import { loadShardDurations, selectGeneralServerShard } from "./general-server-s
 
 import { assertSelectedTests, partitionTestLines } from "./test-line-shard.mjs";
 
-const require = createRequire(import.meta.url);
-const vitestEntry = path.join(path.dirname(require.resolve("vitest/package.json")), "vitest.mjs");
 const repoRoot = process.cwd();
 const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
 const generalServerShardDurations = loadShardDurations(
@@ -329,7 +326,7 @@ function runVitest(args, label, testShard = null) {
   if (testShard) {
     const collect = (filters, name) => {
       const output = path.join(testRoot, `${name}.json`);
-      const result = spawnSync(process.execPath, [vitestEntry, "list", ...sourceOnlyVitestArgs,
+      const result = spawnSync("pnpm", ["exec", "vitest", "list", ...sourceOnlyVitestArgs,
         ...filters, "--allowOnly=false", "--includeTaskLocation", `--json=${output}`], {
         cwd: repoRoot, env, stdio: "inherit",
       });
@@ -345,7 +342,7 @@ function runVitest(args, label, testShard = null) {
     console.log(`[test:run] chat shard ${testShard.index + 1}/${testShard.count}: ${selected.tests.length}/${collected.length} tests, ${selected.lines.length} source lines; exact filter coverage verified`);
     args.push("--allowOnly=false");
   }
-  const result = spawnSync(process.execPath, [vitestEntry, "run", ...sourceOnlyVitestArgs, ...args], {
+  const result = spawnSync("pnpm", ["exec", "vitest", "run", ...sourceOnlyVitestArgs, ...args], {
     cwd: repoRoot,
     env,
     stdio: "inherit",
