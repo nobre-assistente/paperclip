@@ -1635,7 +1635,9 @@ export function agentRoutes(
     const [chainOfCommand, accessState, runtimeState] = await Promise.all([
       svc.getChainOfCommand(agent.id),
       buildAgentAccessState(agent),
-      heartbeat.getRuntimeState(agent.id).catch(() => null),
+      typeof heartbeat.getRuntimeState === "function"
+        ? heartbeat.getRuntimeState(agent.id).catch(() => null)
+        : Promise.resolve(null),
     ]);
 
     const baseAgent = redactAgentRowForResponse(
@@ -4416,7 +4418,6 @@ export function agentRoutes(
     const id = req.params.id as string;
     const agent = await getAccessibleResource(req, res, svc.getById(id), "Agent not found");
     if (!agent) return;
-    assertCompanyAccess(req, agent.companyId);
     if (!(await assertRunTelemetryReadAllowed(req, res, agent.companyId))) return;
     const limitParam = req.query.limit as string | undefined;
     const limit = limitParam ? Math.max(1, Math.min(1000, parseInt(limitParam, 10) || 200)) : undefined;

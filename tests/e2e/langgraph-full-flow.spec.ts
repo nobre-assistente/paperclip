@@ -7,6 +7,13 @@ test.describe("Wave 11 - LangGraph Full Flow E2E", () => {
   test("wave11 langgraph full flow", async ({ page, request }) => {
     test.setTimeout(180_000);
 
+    const isLangGraphAvailable = await fetch("http://127.0.0.1:2024/ok")
+      .then((r) => r.ok)
+      .catch(() => false);
+    test.skip(
+      !isLangGraphAvailable,
+      "Live LangGraph server at http://127.0.0.1:2024 (via SSH tunnel to Oracle VM) is required for this E2E test",
+    );
     // 1. Create a dedicated test company
     const companyRes = await request.post("/api/companies", {
       data: { name: `Wave11 Full Flow Company ${Date.now()}` },
