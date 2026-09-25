@@ -101,7 +101,8 @@ async function ensureWorkspaceLinksCurrent(workspaceDir: string) {
     const linkPath = path.join(repoRoot, mismatch.workspaceDir, "node_modules", ...mismatch.packageName.split("/"));
     await fs.mkdir(path.dirname(linkPath), { recursive: true });
     await fs.rm(linkPath, { recursive: true, force: true });
-    await fs.symlink(mismatch.expectedPath, linkPath);
+    const symlinkType = process.platform === "win32" ? "junction" : "dir";
+    await fs.symlink(mismatch.expectedPath, linkPath, symlinkType);
   }
 
   const remainingMismatches = findWorkspaceLinkMismatches(workspaceDir);
@@ -112,6 +113,22 @@ async function ensureWorkspaceLinksCurrent(workspaceDir: string) {
   );
 }
 
+async function ensureRootWorkspaceLinksCurrent() {
+  for (const [packageName, packagePath] of workspacePackagePaths) {
+    const linkPath = path.join(repoRoot, "node_modules", ...packageName.split("/"));
+    const actualPath = existsSync(linkPath) ? path.resolve(realpathSync(linkPath)) : null;
+    if (actualPath !== path.resolve(packagePath)) {
+      await fs.mkdir(path.dirname(linkPath), { recursive: true });
+      await fs.rm(linkPath, { recursive: true, force: true });
+      const symlinkType = process.platform === "win32" ? "junction" : "dir";
+      await fs.symlink(packagePath, linkPath, symlinkType);
+    }
+  }
+}
+
+await ensureRootWorkspaceLinksCurrent();
+
 for (const workspaceDir of workspaceDirs) {
   await ensureWorkspaceLinksCurrent(workspaceDir);
 }
+

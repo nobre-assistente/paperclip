@@ -72,10 +72,13 @@ const apiPrefixes: Record<string, string> = {
   "tool-access.ts": "/api",
   "tool-gateway.ts": "/api",
   "user-profiles.ts": "/api",
+  "assistants.ts": "/api",
 };
 
 const ROUTE_LITERAL_PATTERN =
   /router\.(get|post|put|patch|delete)\(\s*["'`]([^"'`]+)["'`]/g;
+const ROUTE_ARRAY_PATTERN =
+  /router\.(get|post|put|patch|delete)\(\s*\[([^\]]+)\]/g;
 const ROUTER_METHOD_PATTERN = /router\.(get|post|put|patch|delete)\(/;
 const HTTP_METHODS = new Set([
   "get",
@@ -95,6 +98,10 @@ const explicitOpenApiOperationCoverageExclusions = new Set([
   // board API document, while this exact exclusion keeps route coverage honest.
   "POST /api/chat-webhooks/agentmail/{publicId}",
   "POST /api/chat-webhooks/{publicId}/{provider}",
+  // Unscoped aliases for the canonical routes /api/companies/{companyId}/approvals
+  // and /api/companies/{companyId}/agents documented in OpenAPI.
+  "GET /api/approvals",
+  "POST /api/agents",
 ]);
 
 // The set of contract-first routes whose OpenAPI document leads the mounted
@@ -183,6 +190,20 @@ function loadActualRoutes() {
         excludedRoutes.add(operation);
       } else {
         routes.add(operation);
+      }
+    }
+    for (const match of source.matchAll(ROUTE_ARRAY_PATTERN)) {
+      const method = match[1].toUpperCase();
+      const arrayContent = match[2];
+      const pathMatches = arrayContent.matchAll(/["'`]([^"'`]+)["'`]/g);
+      for (const pathMatch of pathMatches) {
+        const routePath = pathMatch[1];
+        const operation = `${method} ${normalizeExpressPath(resolveMountedPath(file, prefix, routePath))}`;
+        if (explicitOpenApiOperationCoverageExclusions.has(operation)) {
+          excludedRoutes.add(operation);
+        } else {
+          routes.add(operation);
+        }
       }
     }
 

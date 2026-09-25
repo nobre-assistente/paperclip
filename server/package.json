@@ -40,6 +40,7 @@
     "postpack": "rm -rf ui-dist",
     "clean": "rm -rf dist",
     "start": "node dist/index.js",
+    "test": "vitest run",
     "prepare:runner-vendor": "pnpm --filter @paperclipai/paperclip-runner build",
     "typecheck": "pnpm run prepare:runner-vendor && pnpm --filter @paperclipai/plugin-sdk ensure-build-deps && tsc --noEmit"
   },
@@ -110,6 +111,7 @@
     "acpx"
   ],
   "devDependencies": {
+    "@paperclipai/adapter-langgraph": "workspace:*",
     "@paperclipai/paperclip-runner": "workspace:*",
     "@types/express": "^5.0.0",
     "@types/express-serve-static-core": "^5.1.3",

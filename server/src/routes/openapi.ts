@@ -7035,6 +7035,29 @@ registry.registerPath({
 });
 
 // ─── Agent runs & heartbeat ───────────────────────────────────────────────────
+registry.registerPath({
+  method: "get",
+  path: "/api/agents/{id}/runs",
+  tags: ["agents"],
+  summary: "List runs for an agent",
+  request: {
+    params: z.object({ id: z.string() }),
+    query: z.object({
+      limit: z.coerce.number().optional(),
+      summary: z.coerce.boolean().optional(),
+    }),
+  },
+  responses: { 200: r.ok(), 401: r.unauthorized, 404: r.notFound },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/assistants/{assistantId}/graph",
+  tags: ["assistants"],
+  summary: "Get assistant execution topology graph",
+  request: { params: z.object({ assistantId: z.string() }) },
+  responses: { 200: r.ok(), 401: r.unauthorized, 404: r.notFound, 502: r.serverError },
+});
 
 registry.registerPath({
   method: "post",

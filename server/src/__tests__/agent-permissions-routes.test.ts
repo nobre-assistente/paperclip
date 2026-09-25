@@ -87,6 +87,7 @@ const mockHeartbeatService = vi.hoisted(() => ({
   getRun: vi.fn(),
   cancelRun: vi.fn(),
   cancelInvocationsForAgents: vi.fn(),
+  getRuntimeState: vi.fn(),
 }));
 
 const mockIssueApprovalService = vi.hoisted(() => ({
@@ -325,6 +326,8 @@ describe.sequential("agent permission routes", () => {
     mockHeartbeatService.getRun.mockReset();
     mockHeartbeatService.cancelRun.mockReset();
     mockHeartbeatService.cancelInvocationsForAgents.mockReset();
+    mockHeartbeatService.getRuntimeState.mockReset();
+    mockHeartbeatService.getRuntimeState.mockResolvedValue(null);
     mockIssueApprovalService.linkManyForApproval.mockReset();
     mockIssueService.list.mockReset();
     mockSecretService.normalizeAdapterConfigForPersistence.mockReset();

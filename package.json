@@ -45,6 +45,7 @@
     "check:node-version": "node scripts/check-node-version-policy.mjs",
     "check:no-git-push": "node scripts/check-no-git-push.mjs",
     "check:module-boundaries": "node scripts/check-module-boundaries.mjs",
+    "check:anti-hermes": "node scripts/check-anti-hermes.mjs",
     "test:check-no-git-push": "node --test scripts/check-no-git-push.test.mjs",
     "test:install-sh-docker": "./scripts/test-install-sh-docker.sh",
     "test:hermes-gateway-smoke": "node --test scripts/smoke/hermes-gateway-smoke.test.mjs",
@@ -90,9 +91,11 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
+    "@typescript-eslint/parser": "^8.70.1",
     "agentmail": "^0.5.14",
     "cross-env": "^10.1.0",
     "esbuild": "^0.28.2",
+    "eslint": "^10.11.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11"
   },

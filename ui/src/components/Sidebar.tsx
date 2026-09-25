@@ -21,6 +21,7 @@ import {
   GanttChartSquare,
   LayoutGrid,
   Users,
+  Workflow,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -201,6 +202,7 @@ export function Sidebar({ children }: { children?: ReactNode }) {
             </>
           ) : null}
           <SidebarNavItem to="/routines" label="Routines" icon={Repeat} />
+          <SidebarNavItem to="/canvas" label="Canvas" icon={Workflow} />
           <SidebarNavItem to="/artifacts" label="Artifacts" icon={Package} />
           {showCases ? (
             <SidebarNavItem to="/cases" label="Cases" icon={Layers} textBadge="beta" />

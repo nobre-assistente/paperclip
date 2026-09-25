@@ -1,6 +1,6 @@
 import { Router, type Request } from "express";
 import { eq } from "drizzle-orm";
-import { heartbeatRuns, type Db } from "@paperclipai/db";
+import { companies, heartbeatRuns, type Db } from "@paperclipai/db";
 import {
   addApprovalCommentSchema,
   createApprovalSchema,
@@ -202,8 +202,19 @@ export function approvalRoutes(
     return false;
   }
 
-  router.get("/companies/:companyId/approvals", async (req, res) => {
-    const companyId = req.params.companyId as string;
+  router.get(["/companies/:companyId/approvals", "/approvals"], async (req, res) => {
+    let companyId = req.params.companyId as string | undefined;
+    if (!companyId) {
+      companyId = req.query.companyId as string | undefined;
+    }
+    if (!companyId) {
+      const defaultCompany = await db.select({ id: companies.id }).from(companies).limit(1).then((rows) => rows[0] ?? null);
+      companyId = defaultCompany?.id;
+    }
+    if (!companyId) {
+      res.status(400).json({ error: "Company ID is required" });
+      return;
+    }
     assertCompanyAccess(req, companyId);
     if (!(await assertApprovalAccessAllowed(req, res, companyId))) return;
     const status = req.query.status as string | undefined;
@@ -319,6 +330,22 @@ export function approvalRoutes(
       let primaryReviewPathWakeCovered = false;
       if (approval.requestedByAgentId) {
         try {
+          const rawApprovalPayload = (approval.payload && typeof approval.payload === "object" && !Array.isArray(approval.payload))
+            ? (approval.payload as Record<string, unknown>)
+            : {};
+          const approvalInterruptId = typeof rawApprovalPayload.interruptId === "string" ? rawApprovalPayload.interruptId : undefined;
+          const approvalThreadId = typeof rawApprovalPayload.threadId === "string" ? rawApprovalPayload.threadId : undefined;
+
+          const approvalResumeParams = (approvalThreadId || approvalInterruptId) ? {
+            threadId: approvalThreadId,
+            sessionId: approvalThreadId,
+            interruptId: approvalInterruptId,
+            pendingResume: approvalInterruptId ? {
+              interruptId: approvalInterruptId,
+              requestId: approvalInterruptId,
+            } : undefined,
+          } : undefined;
+
           const wakeRun = await heartbeat.wakeup(approval.requestedByAgentId, {
             source: "automation",
             triggerDetail: "system",
@@ -326,6 +353,10 @@ export function approvalRoutes(
             payload: {
               approvalId: approval.id,
               approvalStatus: approval.status,
+              approvalPayload: rawApprovalPayload,
+              ...(approvalInterruptId ? { interruptId: approvalInterruptId } : {}),
+              ...(approvalThreadId ? { threadId: approvalThreadId } : {}),
+              ...(approvalResumeParams ? { resumeSessionParams: approvalResumeParams, resumeSessionDisplayId: approvalThreadId } : {}),
               issueId: primaryIssueId,
               issueIds: linkedIssueIds,
               ...(primaryReviewPathContext ?? {}),
@@ -336,6 +367,10 @@ export function approvalRoutes(
               source: "approval.approved",
               approvalId: approval.id,
               approvalStatus: approval.status,
+              approvalPayload: rawApprovalPayload,
+              ...(approvalInterruptId ? { interruptId: approvalInterruptId } : {}),
+              ...(approvalThreadId ? { threadId: approvalThreadId } : {}),
+              ...(approvalResumeParams ? { resumeSessionParams: approvalResumeParams, resumeSessionDisplayId: approvalThreadId } : {}),
               issueId: primaryIssueId,
               issueIds: linkedIssueIds,
               taskId: primaryIssueId,

@@ -78,11 +78,12 @@ export function linkSdkInto(packageDir) {
   try {
     const stat = lstatSync(linkTarget);
     if (stat.isSymbolicLink()) {
-      if (readlinkSync(linkTarget) === relativeSdkDir) {
+      const currentLink = readlinkSync(linkTarget);
+      if (currentLink === relativeSdkDir || (process.platform === "win32" && resolve(scopeDir, currentLink) === resolve(sdkDir))) {
         // Already linked to the in-repo SDK; nothing to do.
         return false;
       }
-      rmSync(linkTarget, { force: true });
+      rmSync(linkTarget, { force: true, recursive: true });
     } else {
       // A real install has already populated @paperclipai/plugin-sdk (e.g. the
       // plugin host did `npm install` of the published tarball). Leave it.
@@ -93,6 +94,8 @@ export function linkSdkInto(packageDir) {
     if (error?.code !== "ENOENT") throw error;
   }
 
-  symlinkSync(relativeSdkDir, linkTarget, "dir");
+  const symlinkType = process.platform === "win32" ? "junction" : "dir";
+  const targetPath = process.platform === "win32" ? sdkDir : relativeSdkDir;
+  symlinkSync(targetPath, linkTarget, symlinkType);
   return true;
 }

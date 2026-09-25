@@ -26,7 +26,7 @@ function discoverPublicPackages() {
       const pkg = readJson(pkgPath);
       if (!pkg.private) {
         packages.push({
-          dir: relDir,
+          dir: relDir.replace(/\\/g, "/"),
           pkgPath,
           name: pkg.name,
           version: pkg.version,
