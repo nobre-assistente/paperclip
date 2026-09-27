@@ -1,0 +1,323 @@
+{
+  "work_item": "WI-13-005",
+  "issue": "FEA-433",
+  "title": "Configurações Ricas & Contratos Especializados dos 20 Agentes no Paperclip (Schema Injection e Parâmetros Canônicos)",
+  "timestamp": "2026-09-27T17:30:00.000Z",
+  "verdict": "PASS",
+  "contract_schema_injection": {
+    "shared_package": "@paperclipai/shared",
+    "files": [
+      "packages/shared/src/specialist-contracts.ts",
+      "packages/shared/src/specialist-contracts.test.ts",
+      "packages/shared/src/index.ts"
+    ],
+    "specialist_cargos_count": 20,
+    "cargos": [
+      {
+        "cargo": 1,
+        "role": "solution_architect",
+        "title": "Solution Architect Senior",
+        "parameters": [
+          "target_audience",
+          "architecture_style",
+          "nfr_thresholds",
+          "compliance_frameworks"
+        ]
+      },
+      {
+        "cargo": 2,
+        "role": "backend",
+        "title": "Tech Lead / Backend Senior",
+        "parameters": [
+          "db_pool_size",
+          "transaction_timeout_ms",
+          "orm_strict_mode",
+          "query_optimization_level",
+          "api_transport"
+        ]
+      },
+      {
+        "cargo": 4,
+        "role": "devops",
+        "title": "DevOps & Infrastructure Specialist",
+        "parameters": [
+          "rto_seconds",
+          "rpo_seconds",
+          "infrastructure_profile",
+          "policy_strictness",
+          "deploy_strategy"
+        ]
+      },
+      {
+        "cargo": 6,
+        "role": "uiux",
+        "title": "UI/UX Design Systems Lead",
+        "parameters": [
+          "design_system_theme",
+          "component_density",
+          "wcag_compliance_level",
+          "motion_reduced",
+          "figma_sync_enabled"
+        ]
+      },
+      {
+        "cargo": 8,
+        "role": "copywriter",
+        "title": "Senior Copywriter & UX Writer",
+        "parameters": [
+          "tone_of_voice",
+          "reading_level",
+          "cta_density",
+          "brand_vocabulary_whitelist",
+          "emoji_usage"
+        ]
+      },
+      {
+        "cargo": 9,
+        "role": "growth",
+        "title": "Growth & Product Strategy Senior",
+        "parameters": [
+          "target_keywords",
+          "max_daily_budget_cents",
+          "max_cac_cents",
+          "target_channels",
+          "funnel_focus"
+        ]
+      },
+      {
+        "cargo": 9,
+        "role": "code_qa",
+        "title": "Code QA & Test Architect",
+        "parameters": [
+          "coverage_threshold_pct",
+          "sast_severity_level",
+          "mutation_testing_enabled",
+          "fpy_target",
+          "flaky_retry_attempts"
+        ]
+      },
+      {
+        "cargo": 10,
+        "role": "seo",
+        "title": "Technical SEO Specialist",
+        "parameters": [
+          "target_keywords",
+          "max_daily_budget_cents",
+          "max_cac_cents",
+          "target_channels",
+          "crawl_budget_priority"
+        ]
+      },
+      {
+        "cargo": 10,
+        "role": "brand_sentinel",
+        "title": "Brand Sentinel & Compliance Gate",
+        "parameters": [
+          "forbidden_words",
+          "enforce_inclusive_language",
+          "trademark_notice_required",
+          "tone_audit_strictness",
+          "brand_voice_profile"
+        ]
+      },
+      {
+        "cargo": 11,
+        "role": "paid_traffic",
+        "title": "Paid Acquisition Strategist",
+        "parameters": [
+          "target_keywords",
+          "max_daily_budget_cents",
+          "max_cac_cents",
+          "target_channels",
+          "bid_strategy"
+        ]
+      },
+      {
+        "cargo": 11,
+        "role": "legal_security",
+        "title": "Legal & Information Security Officer",
+        "parameters": [
+          "data_classification_default",
+          "pii_masking_mode",
+          "threat_model_framework",
+          "regulatory_scope",
+          "require_crypto_signing"
+        ]
+      },
+      {
+        "cargo": 12,
+        "role": "dpo",
+        "title": "Data Protection Officer (LGPD/GDPR)",
+        "parameters": [
+          "data_classification_default",
+          "pii_masking_mode",
+          "threat_model_framework",
+          "regulatory_scope",
+          "data_retention_days"
+        ]
+      },
+      {
+        "cargo": 13,
+        "role": "localization",
+        "title": "Localization & i18n Engineer",
+        "parameters": [
+          "source_locale",
+          "target_locales",
+          "date_format_locale",
+          "currency_code",
+          "missing_translation_fallback"
+        ]
+      },
+      {
+        "cargo": 14,
+        "role": "data_analyst",
+        "title": "Data Analyst & Telemetry Engineer",
+        "parameters": [
+          "olap_engine",
+          "aggregation_window_seconds",
+          "sampling_rate_pct",
+          "metrics_export_format",
+          "retention_period_days"
+        ]
+      },
+      {
+        "cargo": 15,
+        "role": "crm",
+        "title": "CRM & Lifecycle Operations Lead",
+        "parameters": [
+          "lifecycle_stages",
+          "webhook_retry_limit",
+          "rate_limit_per_minute",
+          "lead_scoring_model",
+          "sync_interval_seconds"
+        ]
+      },
+      {
+        "cargo": 16,
+        "role": "model_risk",
+        "title": "Model Risk & AI Safety Auditor",
+        "parameters": [
+          "adversarial_testing_suite",
+          "hallucination_threshold",
+          "jailbreak_sensitivity",
+          "prompt_injection_detection",
+          "audit_sampling_rate_pct"
+        ]
+      },
+      {
+        "cargo": 17,
+        "role": "graphic_designer",
+        "title": "Graphic & Visual Designer",
+        "parameters": [
+          "primary_color_palette",
+          "aspect_ratios",
+          "output_format",
+          "optimize_vectors",
+          "dpi_resolution"
+        ]
+      },
+      {
+        "cargo": 18,
+        "role": "accessibility",
+        "title": "Accessibility (a11y) Specialist",
+        "parameters": [
+          "wcag_target_level",
+          "screen_reader_verbosity",
+          "contrast_ratio_minimum",
+          "keyboard_navigation_strict",
+          "focus_indicator_visible"
+        ]
+      },
+      {
+        "cargo": 18,
+        "role": "api_contract",
+        "title": "API Contract Engineer",
+        "parameters": [
+          "openapi_version",
+          "breaking_change_policy",
+          "naming_convention",
+          "spectral_ruleset",
+          "mock_server_enabled"
+        ]
+      },
+      {
+        "cargo": 20,
+        "role": "frontend",
+        "title": "Frontend Senior Engineer",
+        "parameters": [
+          "framework",
+          "state_management",
+          "max_bundle_size_kb",
+          "strict_typescript",
+          "css_strategy"
+        ]
+      }
+    ],
+    "llm_configuration": {
+      "model_presets": [
+        "google-antigravity/gemini-3.8-flash",
+        "google-antigravity/gemini-2.5-pro",
+        "omp/gemini-3.8-flash",
+        "omp/claude-3-7-sonnet",
+        "antigravity/claude-3-7-sonnet",
+        "openai/gpt-4o",
+        "anthropic/claude-3-5-sonnet"
+      ],
+      "temperature_range": [0.0, 1.5],
+      "custom_system_prompt_supported": true
+    }
+  },
+  "ui_implementation": {
+    "components": [
+      "ui/src/components/agent-config/SpecialistContractForm.tsx",
+      "ui/src/components/agent-config/index.ts",
+      "ui/src/components/agent-config/SpecialistContractForm.test.tsx"
+    ],
+    "integrations": [
+      "ui/src/adapters/langgraph/config-fields.tsx",
+      "ui/src/adapters/langgraph/index.ts",
+      "ui/src/adapters/types.ts",
+      "ui/src/components/AgentConfigForm.tsx",
+      "ui/src/lib/agent-config-patch.ts"
+    ],
+    "dual_persistence": {
+      "adapter_config": "specialistContract, model, temperature, systemPrompt",
+      "metadata": "cargo, cargoName, specialistContract, model, temperature, systemPrompt"
+    }
+  },
+  "adapter_langgraph_implementation": {
+    "file": "packages/adapters/langgraph/src/server/execute.ts",
+    "tests": "packages/adapters/langgraph/src/server/execute.test.ts",
+    "forwarding_mechanisms": {
+      "input_payload": [
+        "specialist_contract",
+        "specialist_config",
+        "model",
+        "temperature",
+        "system_prompt",
+        "top_level_contract_parameters"
+      ],
+      "run_config_configurable": [
+        "configurable.<param_key>",
+        "configurable.model",
+        "configurable.temperature",
+        "configurable.system_prompt"
+      ],
+      "request_context": [
+        "context.specialist_contract",
+        "context.model"
+      ]
+    }
+  },
+  "validation_results": {
+    "shared_typecheck": "PASS (0 errors)",
+    "shared_build": "PASS (0 errors)",
+    "shared_vitest": "PASS (9/9 passed in specialist-contracts.test.ts)",
+    "adapter_langgraph_typecheck": "PASS (0 errors)",
+    "adapter_langgraph_build": "PASS (0 errors)",
+    "adapter_langgraph_vitest": "PASS (40/40 passed)",
+    "ui_build": "PASS (0 errors)",
+    "ui_vitest": "PASS (SpecialistContractForm.test.tsx, agent-config-patch.test.ts, AgentConfigForm.render.test.tsx)",
+    "token_gate_check": "PASS (0 violations in changed/created files)"
+  }
+}

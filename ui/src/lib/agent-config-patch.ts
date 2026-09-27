@@ -7,6 +7,7 @@ export interface AgentConfigOverlay {
   heartbeat: Record<string, unknown>;
   debug: Record<string, unknown>;
   runtime: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 }
 
 export function omitUndefinedEntries(value: Record<string, unknown>) {
@@ -75,6 +76,14 @@ export function buildAgentUpdatePatch(agent: Agent, overlay: AgentConfigOverlay)
 
   if (Object.keys(overlay.runtime).length > 0) {
     Object.assign(patch, overlay.runtime);
+  }
+
+  if (overlay.metadata && Object.keys(overlay.metadata).length > 0) {
+    const existingMeta = (agent.metadata ?? {}) as Record<string, unknown>;
+    patch.metadata = omitUndefinedEntries({
+      ...existingMeta,
+      ...overlay.metadata,
+    });
   }
 
   return patch;

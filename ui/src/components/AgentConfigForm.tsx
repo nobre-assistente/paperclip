@@ -106,6 +106,8 @@ import {
 } from "@paperclipai/adapter-utils";
 import { Badge } from "@/components/ui/badge";
 
+import { SpecialistContractForm } from "./agent-config/SpecialistContractForm";
+import { resolveSpecialistRole } from "@paperclipai/shared";
 /* ---- Props ---- */
 
 type AgentConfigFormProps = {
@@ -166,6 +168,7 @@ const emptyOverlay: AgentConfigOverlay = {
   heartbeat: {},
   debug: {},
   runtime: {},
+  metadata: {},
 };
 
 /** Stable empty object used as fallback for missing env config to avoid new-object-per-render. */
@@ -189,7 +192,8 @@ function isOverlayDirty(o: AgentConfigOverlay): boolean {
     Object.keys(o.adapterConfig).length > 0 ||
     Object.keys(o.heartbeat).length > 0 ||
     Object.keys(o.debug).length > 0 ||
-    Object.keys(o.runtime).length > 0
+    Object.keys(o.runtime).length > 0 ||
+    (o.metadata !== undefined && Object.keys(o.metadata).length > 0)
   );
 }
 
@@ -248,6 +252,7 @@ export function subtractPersistedOverlay(
     heartbeat: subtractGroup(current.heartbeat, persisted.heartbeat),
     debug: subtractGroup(current.debug, persisted.debug),
     runtime: subtractGroup(current.runtime, persisted.runtime),
+    metadata: subtractGroup(current.metadata ?? {}, persisted.metadata ?? {}),
   };
 }
 
@@ -505,12 +510,12 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
 
   const isDirty = !isCreate && (isOverlayDirty(overlay) || environmentDraftDirty);
 
-  type RecordOverlayGroup = "identity" | "adapterConfig" | "heartbeat" | "debug" | "runtime";
+  type RecordOverlayGroup = "identity" | "adapterConfig" | "heartbeat" | "debug" | "runtime" | "metadata";
 
   /** Read effective value: overlay if dirty, else original */
   function eff<T>(group: RecordOverlayGroup, field: string, original: T): T {
     const o = overlay[group];
-    if (field in o) return o[field] as T;
+    if (o && field in o) return o[field] as T;
     return original;
   }
 
@@ -518,7 +523,7 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
   function mark(group: RecordOverlayGroup, field: string, value: unknown) {
     setOverlay((prev) => ({
       ...prev,
-      [group]: { ...prev[group], [field]: value },
+      [group]: { ...(prev[group] ?? {}), [field]: value },
     }));
   }
 
@@ -944,14 +949,15 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
     values: isCreate ? props.values : null,
     set: isCreate ? (patch: Partial<CreateConfigValues>) => props.onChange(patch) : null,
     config,
-    eff: eff as <T>(group: "adapterConfig", field: string, original: T) => T,
-    mark: mark as (group: "adapterConfig", field: string, value: unknown) => void,
+    eff: eff as <T>(group: "adapterConfig" | "metadata", field: string, original: T) => T,
+    mark: mark as (group: "adapterConfig" | "metadata", field: string, value: unknown) => void,
     models,
     // Resolve the effective instructions-file gate once. The instructions file
     // is an absolute host path, so the managed-sandbox-only policy hides it for
     // every adapter without a per-adapter edit.
     hideInstructionsFile: hideInstructionsFile || hideHostPaths,
     managedSandboxOnly: hideHostPaths,
+    agent: !isCreate ? props.agent : null,
   };
 
   // Section toggle state — advanced always starts collapsed
@@ -1832,6 +1838,19 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
                 </>
               )}
               {renderAdapterFields("configuration")}
+              {adapterType !== "langgraph" && !isCreate && Boolean(
+                (props.agent.metadata as Record<string, unknown> | null)?.cargo !== undefined ||
+                resolveSpecialistRole((props.agent.metadata as Record<string, unknown> | null)?.cargoName as string) ||
+                resolveSpecialistRole((props.agent.adapterConfig as Record<string, unknown> | null)?.assistantId as string) ||
+                resolveSpecialistRole(props.agent.role)
+              ) && (
+                <SpecialistContractForm
+                  agent={props.agent}
+                  config={config}
+                  eff={eff as <T>(group: "adapterConfig" | "metadata", field: string, original: T) => T}
+                  mark={mark as (group: "adapterConfig" | "metadata", field: string, value: unknown) => void}
+                />
+              )}
               {(isLocal || adapterType === "process" || configSchema?.fields.some((field) => schemaFieldSection(field.key) === "advanced")) && (
               <CollapsibleSection
                 title="Advanced"

@@ -173,4 +173,25 @@ describe("buildAgentUpdatePatch", () => {
       desiredSkills: ["research", "code-review"],
     });
   });
+
+  it("merges metadata overlay when metadata is modified", () => {
+    const agent = {
+      ...makeAgent(),
+      metadata: { cargo: 4, cargoName: "devops" },
+    };
+    const patch = buildAgentUpdatePatch(
+      agent,
+      makeOverlay({
+        metadata: {
+          specialistContract: { rto_seconds: 120, deploy_strategy: "rolling" },
+        },
+      }),
+    );
+
+    expect(patch.metadata).toEqual({
+      cargo: 4,
+      cargoName: "devops",
+      specialistContract: { rto_seconds: 120, deploy_strategy: "rolling" },
+    });
+  });
 });

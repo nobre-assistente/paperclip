@@ -2,7 +2,7 @@ import type { ChangeEvent } from "react";
 import { FENIX_SPECIALIST_PRESETS, findFenixPreset } from "@paperclipai/shared";
 import type { AdapterConfigFieldsProps } from "../types";
 import { DraftInput, DraftNumberInput, Field } from "../../components/agent-config-primitives";
-
+import { SpecialistContractForm } from "../../components/agent-config/SpecialistContractForm";
 const inputClass =
   "w-full rounded-md border border-border px-2.5 py-1.5 bg-transparent outline-none text-sm font-mono placeholder:text-muted-foreground/40";
 const selectClass =
@@ -15,6 +15,7 @@ export function LangGraphConfigFields({
   config,
   eff,
   mark,
+  agent,
 }: AdapterConfigFieldsProps) {
   const baseUrl = isCreate
     ? ((values?.adapterSchemaValues?.baseUrl as string) ?? "http://127.0.0.1:2024")
@@ -130,6 +131,18 @@ export function LangGraphConfigFields({
           immediate
         />
       </Field>
+
+      {/* Specialized Rich Contract & LLM Parameters */}
+      <SpecialistContractForm
+        isCreate={isCreate}
+        agent={agent}
+        values={values}
+        set={set}
+        config={config}
+        eff={eff}
+        mark={mark}
+        defaultRole={assistantId}
+      />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import type {
 import type {
   JsonValue,
   LangGraphInterrupt,
+  LangGraphRunConfig,
   LangGraphRunRequest,
   LangGraphRunResponse,
   LangGraphSessionParams,
@@ -415,6 +416,149 @@ export async function execute(
     inputPayload.thread_id = `${tenantId}:${inputPayload.project_id}:${ctx.runId ?? threadId}`;
   }
 
+  // Extract custom specialist configuration and contract parameters
+  const agentRecord = ctx.agent as unknown as { metadata?: Record<string, unknown> };
+  const agentMetadata = agentRecord?.metadata ?? {};
+  const rawSpecialistContract =
+    (ctx.config.specialistContract as Record<string, unknown> | undefined) ??
+    (ctx.config.specialist_contract as Record<string, unknown> | undefined) ??
+    (ctx.config.specialistConfig as Record<string, unknown> | undefined) ??
+    (ctx.config.specialist_config as Record<string, unknown> | undefined) ??
+    (agentMetadata.specialistContract as Record<string, unknown> | undefined) ??
+    (agentMetadata.specialist_contract as Record<string, unknown> | undefined) ??
+    (agentMetadata.specialistConfig as Record<string, unknown> | undefined) ??
+    (agentMetadata.specialist_config as Record<string, unknown> | undefined) ??
+    {};
+
+  const specialistModel =
+    (ctx.config.model as string | undefined) ??
+    (ctx.config.modelName as string | undefined) ??
+    (agentMetadata.model as string | undefined);
+
+  const specialistTemperature =
+    typeof ctx.config.temperature === "number"
+      ? ctx.config.temperature
+      : typeof agentMetadata.temperature === "number"
+        ? agentMetadata.temperature
+        : undefined;
+
+  const specialistSystemPrompt =
+    (ctx.config.systemPrompt as string | undefined) ??
+    (ctx.config.system_prompt as string | undefined) ??
+    (ctx.config.promptTemplate as string | undefined) ??
+    (agentMetadata.systemPrompt as string | undefined) ??
+    (agentMetadata.system_prompt as string | undefined);
+
+  const specialistProvider =
+    (ctx.config.provider as string | undefined) ??
+    (agentMetadata.provider as string | undefined);
+
+  const specialistContractPayload: Record<string, JsonValue> = {};
+  for (const [k, v] of Object.entries(rawSpecialistContract)) {
+    if (v !== undefined) {
+      specialistContractPayload[k] = v as JsonValue;
+    }
+  }
+
+  // Include any direct specialized parameters on ctx.config not in base adapter or tenant set
+  const NON_SPECIALIST_KEYS: Record<string, true> = {
+    baseUrl: true,
+    assistantId: true,
+    runTimeoutMs: true,
+    input: true,
+    config: true,
+    context: true,
+    dangerouslyBypassSandbox: true,
+    env: true,
+    cwd: true,
+    action: true,
+    resumePayload: true,
+    specialistContract: true,
+    specialist_contract: true,
+    specialistConfig: true,
+    specialist_config: true,
+    tenantId: true,
+    tenant_id: true,
+    companyId: true,
+    company_id: true,
+    agentId: true,
+    agent_id: true,
+    model: true,
+    modelName: true,
+    temperature: true,
+    systemPrompt: true,
+    system_prompt: true,
+    promptTemplate: true,
+    provider: true,
+  };
+  for (const [k, v] of Object.entries(ctx.config)) {
+    if (!NON_SPECIALIST_KEYS[k] && v !== undefined && !(k in specialistContractPayload)) {
+      specialistContractPayload[k] = v as JsonValue;
+    }
+  }
+
+  if (Object.keys(specialistContractPayload).length > 0) {
+    inputPayload.specialist_contract = specialistContractPayload;
+    inputPayload.specialist_config = specialistContractPayload;
+    const RESERVED_INPUT_KEYS: Record<string, true> = {
+      tenant_id: true,
+      project_id: true,
+      run_id: true,
+      thread_id: true,
+      task_id: true,
+      issue_id: true,
+      wake_reason: true,
+      prompt: true,
+      user_prompt: true,
+      message: true,
+      input: true,
+      messages: true,
+    };
+    for (const [k, v] of Object.entries(specialistContractPayload)) {
+      if (!RESERVED_INPUT_KEYS[k] && inputPayload[k] === undefined) {
+        inputPayload[k] = v;
+      }
+    }
+  }
+  if (specialistModel) {
+    inputPayload.model = specialistModel;
+  }
+  if (specialistTemperature !== undefined) {
+    inputPayload.temperature = specialistTemperature;
+  }
+  if (specialistSystemPrompt) {
+    inputPayload.system_prompt = specialistSystemPrompt;
+    inputPayload.systemPrompt = specialistSystemPrompt;
+  }
+  if (specialistProvider) {
+    inputPayload.provider = specialistProvider;
+  }
+
+  const existingConfigurable = {
+    ...((ctx.config.config as Record<string, unknown>)?.configurable as Record<string, JsonValue> ?? {}),
+    ...((ctx.config.configurable as Record<string, JsonValue>) ?? {}),
+  };
+
+  const configurablePayload: Record<string, JsonValue> = {
+    ...existingConfigurable,
+    ...specialistContractPayload,
+    ...(specialistModel ? { model: specialistModel } : {}),
+    ...(specialistTemperature !== undefined ? { temperature: specialistTemperature } : {}),
+    ...(specialistSystemPrompt ? { system_prompt: specialistSystemPrompt } : {}),
+    ...(specialistProvider ? { provider: specialistProvider } : {}),
+  };
+
+  const runConfig: LangGraphRunConfig | undefined = Object.keys(configurablePayload).length > 0
+    ? { configurable: configurablePayload }
+    : (ctx.config.config as LangGraphRunConfig | undefined);
+
+  if (Object.keys(specialistContractPayload).length > 0) {
+    requestContext.specialist_contract = specialistContractPayload;
+  }
+  if (specialistModel) {
+    requestContext.model = specialistModel;
+  }
+
   let runRequest: LangGraphRunRequest;
   if (isResumeAttempt) {
     runRequest = {
@@ -422,12 +566,14 @@ export async function execute(
       command: {
         resume: resumePayload!,
       },
+      ...(runConfig ? { config: runConfig } : {}),
       context: requestContext,
     };
   } else {
     runRequest = {
       assistant_id: config.assistantId,
       input: inputPayload,
+      ...(runConfig ? { config: runConfig } : {}),
       context: requestContext,
     };
   }
