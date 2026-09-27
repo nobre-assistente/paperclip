@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import type { AdapterModel } from "@paperclipai/adapter-utils";
 import { asString, runChildProcess } from "@paperclipai/adapter-utils/server-utils";
-
 const MODELS_CACHE_TTL_MS = 60_000;
 
 function firstNonEmptyLine(text: string): string {
@@ -63,13 +65,68 @@ function sortModels(models: AdapterModel[]): AdapterModel[] {
   );
 }
 
-function resolvePiCommand(input: unknown): string {
+export const ANTIGRAVITY_CATALOG_MODELS: AdapterModel[] = [
+  { id: "google-antigravity/gemini-3.8-flash", label: "google-antigravity/gemini-3.8-flash" },
+  { id: "google-antigravity/gemini-3.8-pro", label: "google-antigravity/gemini-3.8-pro" },
+  { id: "google-antigravity/claude-sonnet-4-5", label: "google-antigravity/claude-sonnet-4-5" },
+];
+
+export function isCommandAvailable(cmd: string): boolean {
+  if (path.isAbsolute(cmd)) {
+    try {
+      return fs.existsSync(cmd) && (fs.statSync(cmd).mode & 0o111) !== 0;
+    } catch {
+      return false;
+    }
+  }
+  const pathEnv = process.env.PATH ?? "";
+  const dirs = pathEnv.split(path.delimiter);
+  for (const dir of dirs) {
+    if (!dir) continue;
+    const fullPath = path.join(dir, cmd);
+    try {
+      if (fs.existsSync(fullPath) && (fs.statSync(fullPath).mode & 0o111) !== 0) {
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return false;
+}
+
+export function resolvePiCommand(input?: unknown): string {
+  const custom = typeof input === "string" ? input.trim() : "";
+  if (custom && custom !== "pi") {
+    return custom;
+  }
   const envOverride =
     typeof process.env.PAPERCLIP_PI_COMMAND === "string" &&
     process.env.PAPERCLIP_PI_COMMAND.trim().length > 0
       ? process.env.PAPERCLIP_PI_COMMAND.trim()
-      : "pi";
-  return asString(input, envOverride);
+      : undefined;
+  if (envOverride) {
+    if (envOverride !== "pi" || isCommandAvailable("pi")) {
+      return envOverride;
+    }
+  }
+  if (custom === "pi" && isCommandAvailable("pi")) {
+    return "pi";
+  }
+  if (isCommandAvailable("pi")) {
+    return "pi";
+  }
+  if (isCommandAvailable("omp")) {
+    return "omp";
+  }
+  if (fs.existsSync("/home/orca/.local/bin/omp")) {
+    return "/home/orca/.local/bin/omp";
+  }
+  const userHomeOmp = path.join(os.homedir(), ".local", "bin", "omp");
+  if (fs.existsSync(userHomeOmp)) {
+    return userHomeOmp;
+  }
+  return "omp";
 }
 
 const discoveryCache = new Map<string, { expiresAt: number; models: AdapterModel[] }>();
@@ -109,6 +166,68 @@ export async function discoverPiModels(input: {
   const cwd = asString(input.cwd, process.cwd());
   const env = normalizeEnv(input.env);
   const runtimeEnv = normalizeEnv({ ...process.env, ...env });
+
+  const isOmp = command === "omp" || command.endsWith("/omp");
+
+  if (isOmp) {
+    // 1. Try omp --list-models first as per specification
+    try {
+      const result = await runChildProcess(
+        `pi-models-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        command,
+        ["--list-models"],
+        {
+          cwd,
+          env: runtimeEnv,
+          timeoutSec: 20,
+          graceSec: 3,
+          onLog: async () => {},
+        },
+      );
+      if (!result.timedOut && (result.exitCode ?? 1) === 0) {
+        const output = result.stderr || result.stdout;
+        const parsed = parseModelsOutput(output);
+        if (parsed.length > 0) {
+          return sortModels(dedupeModels([...ANTIGRAVITY_CATALOG_MODELS, ...parsed]));
+        }
+      }
+    } catch {
+      // Fall through to omp models --json or static catalog
+    }
+
+    // 2. Try omp models --json
+    try {
+      const resultJson = await runChildProcess(
+        `omp-models-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        command,
+        ["models", "--json"],
+        {
+          cwd,
+          env: runtimeEnv,
+          timeoutSec: 20,
+          graceSec: 3,
+          onLog: async () => {},
+        },
+      );
+      if (!resultJson.timedOut && (resultJson.exitCode ?? 1) === 0) {
+        const data = JSON.parse(resultJson.stdout) as {
+          models?: Array<{ id: string; provider: string; selector?: string }>;
+        };
+        if (Array.isArray(data?.models)) {
+          const discovered: AdapterModel[] = data.models.map((m) => {
+            const id = m.selector || `${m.provider}/${m.id}`;
+            return { id, label: id };
+          });
+          return sortModels(dedupeModels([...ANTIGRAVITY_CATALOG_MODELS, ...discovered]));
+        }
+      }
+    } catch {
+      // Fall through to static catalog
+    }
+
+    // 3. Fallback to static catalog models
+    return sortModels(dedupeModels([...ANTIGRAVITY_CATALOG_MODELS]));
+  }
 
   const result = await runChildProcess(
     `pi-models-${Date.now()}-${Math.random().toString(16).slice(2)}`,

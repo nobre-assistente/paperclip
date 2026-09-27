@@ -198,7 +198,7 @@ vi.mock("../adapters/adapter-display-registry", () => ({
     // then sat in the "Advanced settings" disclosure and was reachable anyway;
     // with the step down to a tile row built from this flag, it made that row
     // empty in every test and hid the surface under it.
-    recommended: type === "claude_local" || type === "codex_local",
+    recommended: type === "claude_local" || type === "codex_local" || type === "pi_local",
     label: type,
     description: "",
     icon: () => null,
@@ -2081,6 +2081,36 @@ describe("OnboardingWizard restore-gate (stale localStorage across accounts)", (
       // registry label is the adapter type, and it must not reach the tile.
       expect(labels.join(" ")).not.toContain("claude_local");
       expect(labels.join(" ")).not.toContain("codex_local");
+
+      await act(async () => root.unmount());
+    });
+    it("renders the 3 primary tiles including OMP (Antigravity) and allows 1-click connect", async () => {
+      mockAdapterRegistry.list = [
+        { type: "claude_local" },
+        { type: "codex_local" },
+        { type: "pi_local" },
+      ];
+      const { root } = await openStep4({ adapterType: "pi_local" });
+
+      const labels = [...document.body.querySelectorAll("button[aria-checked]")].map(
+        (tile) => tile.textContent ?? "",
+      );
+      expect(labels.length).toBe(3);
+      expect(labels.some((l) => l.includes("Claude"))).toBe(true);
+      expect(labels.some((l) => l.includes("OpenAI"))).toBe(true);
+      expect(labels.some((l) => l.includes("OMP (Antigravity)"))).toBe(true);
+
+      await pickSource(/OMP/);
+      for (let i = 0; i < 8; i++) await flushReact();
+
+      expect(document.body.textContent).toContain("Pool Antigravity Conectado");
+      expect(document.body.textContent).toContain("contas ativas no cofre");
+
+      const connectButton = [...document.body.querySelectorAll("button")].find(
+        (b) => b.textContent?.includes("Connect")
+      );
+      expect(connectButton).toBeDefined();
+      expect(connectButton?.hasAttribute("disabled")).toBe(false);
 
       await act(async () => root.unmount());
     });

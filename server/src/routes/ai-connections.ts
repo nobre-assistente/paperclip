@@ -28,6 +28,26 @@ import { accessService } from "../services/access.js";
 import { logActivity } from "../services/activity-log.js";
 import { aiConnectionService } from "../services/ai-connections.js";
 import { validate } from "../middleware/validate.js";
+import { antigravityPoolService } from "../services/antigravity-pool.js";
+
+const antigravitySwitchSchema = z.object({
+  account: z.string().min(1),
+  force: z.boolean().optional(),
+});
+
+const antigravityNextSchema = z.object({
+  force: z.boolean().optional(),
+  tier: z.string().optional(),
+});
+
+const antigravityRefreshSchema = z.object({
+  account: z.string().optional(),
+});
+
+const antigravityGateLockSchema = z.object({
+  taskId: z.string().min(1),
+  size: z.enum(["light", "medium", "heavy"]).optional(),
+});
 
 /** Agent API calls inherit authenticated run identity, never the agent's own ID. */
 export function responsibleUserForAiRequest(req: Request): string | null {
@@ -367,5 +387,106 @@ export function aiConnectionRoutes(db: Db, options: Parameters<typeof supportsLo
       res.json(session);
     },
   );
+  // -------------------------------------------------------------
+  // Antigravity Multi-Account Pool & Switcher Bridge (WI-12-012)
+  // -------------------------------------------------------------
+  router.get(["/ai-connections/antigravity/pool", "/ai-connections/antigravity"], async (req, res, next) => {
+    try {
+      const refresh = req.query.refresh === "true" || req.query.refresh === "1";
+      const status = await antigravityPoolService.getPoolStatus(refresh);
+      res.setHeader("Cache-Control", "no-store");
+      res.json(status);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post("/ai-connections/antigravity/switch", async (req, res, next) => {
+    try {
+      const parsed = antigravitySwitchSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({
+          error: "Invalid request payload",
+          details: parsed.error.issues,
+        });
+        return;
+      }
+      const result = await antigravityPoolService.switchAccount(parsed.data.account, parsed.data.force);
+      res.setHeader("Cache-Control", "no-store");
+      res.status(result.ok ? 200 : 400).json(result);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post("/ai-connections/antigravity/next", async (req, res, next) => {
+    try {
+      const parsed = antigravityNextSchema.safeParse(req.body || {});
+      const force = parsed.success ? parsed.data.force : false;
+      const tier = parsed.success ? parsed.data.tier : undefined;
+      const result = await antigravityPoolService.rotateNextHealthy(tier, force);
+      res.setHeader("Cache-Control", "no-store");
+      res.status(result.ok ? 200 : 400).json(result);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post("/ai-connections/antigravity/refresh", async (req, res, next) => {
+    try {
+      const parsed = antigravityRefreshSchema.safeParse(req.body || {});
+      const account = parsed.success ? parsed.data.account : undefined;
+      const result = await antigravityPoolService.refreshPoolOAuth(account);
+      res.setHeader("Cache-Control", "no-store");
+      res.status(result.ok ? 200 : 400).json(result);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post(["/ai-connections/antigravity/sync-omp", "/ai-connections/antigravity/sync"], async (_req, res, next) => {
+    try {
+      const dbConsistency = antigravityPoolService.ensureAgentDbConsistency();
+      const status = await antigravityPoolService.getPoolStatus(false);
+      res.setHeader("Cache-Control", "no-store");
+      res.status(200).json({
+        ok: true,
+        action: "sync-omp",
+        db_promoted_id_1: dbConsistency.promotedId1,
+        active: status.active,
+        status,
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post(["/ai-connections/antigravity/gate/lock", "/ai-connections/antigravity/gate-lock"], async (req, res, next) => {
+    try {
+      const parsed = antigravityGateLockSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({
+          error: "Invalid request payload: taskId is required",
+          details: parsed.error.issues,
+        });
+        return;
+      }
+      const result = await antigravityPoolService.gateLock(parsed.data.taskId, parsed.data.size);
+      res.setHeader("Cache-Control", "no-store");
+      res.status(result.ok ? 200 : 400).json(result);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post(["/ai-connections/antigravity/gate/unlock", "/ai-connections/antigravity/gate-unlock"], async (_req, res, next) => {
+    try {
+      const result = await antigravityPoolService.gateUnlock();
+      res.setHeader("Cache-Control", "no-store");
+      res.status(result.ok ? 200 : 400).json(result);
+    } catch (err) {
+      next(err);
+    }
+  });
   return router;
 }

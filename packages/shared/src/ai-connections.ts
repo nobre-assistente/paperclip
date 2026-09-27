@@ -31,6 +31,7 @@ export const AI_PROVIDERS = [
   "openai",
   "openrouter",
   "xai",
+  "antigravity",
 ] as const;
 export const aiProviderSchema = z.enum(AI_PROVIDERS);
 export const aiAuthMethodSchema = z.enum(["subscription", "api_key"]);
@@ -107,6 +108,19 @@ export const AI_CONNECTION_CAPABILITIES: Record<
       api_key: { adapters: ["grok_local"], envKey: "XAI_API_KEY" },
     },
   },
+  antigravity: {
+    name: "OMP (Antigravity)",
+    methods: {
+      subscription: {
+        adapters: ["pi_local", "langgraph"],
+        envKey: "OMP_HOME",
+      },
+      api_key: {
+        adapters: ["pi_local", "langgraph"],
+        envKey: "GOOGLE_API_KEY",
+      },
+    },
+  },
 };
 export function isAiConnectionCompatible(
   requirement: AiConnectionMetadata | AiConnectionBinding,
@@ -124,7 +138,11 @@ export function isAiConnectionCompatible(
           ? "codex_local"
           : runnerProvider === "opencode"
             ? "opencode_local"
-            : "unsupported";
+            : runnerProvider === "pi" || runnerProvider === "omp" || runnerProvider === "antigravity"
+              ? "pi_local"
+              : runnerProvider === "langgraph"
+                ? "langgraph"
+                : "unsupported";
   const methods = AI_CONNECTION_CAPABILITIES[requirement.provider].methods;
   const candidates = "mode" in requirement && requirement.mode === "responsible_user"
     ? Object.values(methods)

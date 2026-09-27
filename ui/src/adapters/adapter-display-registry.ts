@@ -118,9 +118,10 @@ const adapterDisplayMap: Record<string, AdapterDisplayInfo> = {
     icon: OpenCodeLogoIcon,
   },
   pi_local: {
-    label: "Pi",
-    description: "Pi harness",
+    label: "OMP (Antigravity)",
+    description: "Oh My Pi CLI harness + Antigravity Multi-Account Pool",
     icon: Terminal,
+    recommended: true,
   },
   cursor: {
     label: "Cursor",

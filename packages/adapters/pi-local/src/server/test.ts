@@ -1,3 +1,7 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import type {
   AdapterEnvironmentCheck,
   AdapterEnvironmentTestContext,
@@ -19,7 +23,7 @@ import {
   describeAdapterExecutionTarget,
   resolveAdapterExecutionTargetCwd,
 } from "@paperclipai/adapter-utils/execution-target";
-import { discoverPiModelsCached } from "./models.js";
+import { discoverPiModelsCached, resolvePiCommand } from "./models.js";
 import { parsePiJsonl } from "./parse.js";
 import { SANDBOX_INSTALL_COMMAND } from "../index.js";
 
@@ -78,12 +82,113 @@ function buildPiModelDiscoveryFailureCheck(message: string): AdapterEnvironmentC
   };
 }
 
+export interface OmpAntigravityCredentialCheckResult {
+  valid: boolean;
+  count: number;
+  blockedCount: number;
+  details?: string;
+  error?: string;
+}
+
+export function checkOmpAntigravityCredentials(
+  dbPath?: string,
+): OmpAntigravityCredentialCheckResult {
+  const resolvedDbPath = dbPath ?? path.join(os.homedir(), ".omp", "agent", "agent.db");
+  if (!fs.existsSync(resolvedDbPath)) {
+    return {
+      valid: false,
+      count: 0,
+      blockedCount: 0,
+      error: `OMP agent database not found at ${resolvedDbPath}`,
+    };
+  }
+
+  try {
+    const db = new DatabaseSync(resolvedDbPath, { open: true, readOnly: true });
+    try {
+      const credStmt = db.prepare(`
+        SELECT id, provider, credential_type, disabled_cause 
+        FROM auth_credentials 
+        WHERE provider = 'google-antigravity'
+      `);
+      const creds = credStmt.all() as Array<{
+        id: number;
+        provider: string;
+        credential_type: string;
+        disabled_cause: string | null;
+      }>;
+
+      if (!creds || creds.length === 0) {
+        return {
+          valid: false,
+          count: 0,
+          blockedCount: 0,
+          details: "No google-antigravity credentials found in OMP agent database.",
+        };
+      }
+
+      const activeCreds = creds.filter((c) => !c.disabled_cause);
+      if (activeCreds.length === 0) {
+        return {
+          valid: false,
+          count: creds.length,
+          blockedCount: 0,
+          details: "All google-antigravity credentials have disabled_cause set.",
+        };
+      }
+
+      const nowMs = Date.now();
+      const activeIds = activeCreds.map((c) => c.id);
+      const placeholders = activeIds.map(() => "?").join(",");
+      const blockStmt = db.prepare(`
+        SELECT credential_id, blocked_until_ms 
+        FROM auth_credential_blocks 
+        WHERE credential_id IN (${placeholders})
+          AND blocked_until_ms > ?
+      `);
+      const blocks = blockStmt.all(...activeIds, nowMs) as Array<{
+        credential_id: number;
+        blocked_until_ms: number;
+      }>;
+
+      const blockedIds = new Set(blocks.map((b) => b.credential_id));
+      const unblockedCreds = activeCreds.filter((c) => !blockedIds.has(c.id));
+
+      if (unblockedCreds.length === 0) {
+        return {
+          valid: false,
+          count: activeCreds.length,
+          blockedCount: blockedIds.size,
+          details: `All ${activeCreds.length} google-antigravity credentials are currently blocked.`,
+        };
+      }
+
+      return {
+        valid: true,
+        count: unblockedCreds.length,
+        blockedCount: blockedIds.size,
+        details: `Found ${unblockedCreds.length} valid unblocked google-antigravity credential(s).`,
+      };
+    } finally {
+      db.close();
+    }
+  } catch (err) {
+    return {
+      valid: false,
+      count: 0,
+      blockedCount: 0,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 export async function testEnvironment(
   ctx: AdapterEnvironmentTestContext,
 ): Promise<AdapterEnvironmentTestResult> {
   const checks: AdapterEnvironmentCheck[] = [];
   const config = parseObject(ctx.config);
-  const command = asString(config.command, "pi");
+  const command = resolvePiCommand(config.command);
+  const isOmp = command === "omp" || command.endsWith("/omp");
   const target = ctx.executionTarget ?? null;
   const targetIsRemote = target?.kind === "remote";
   const cwd = resolveAdapterExecutionTargetCwd(target, asString(config.cwd, ""), process.cwd());
@@ -194,7 +299,32 @@ export async function testEnvironment(
     }
   }
 
-  const configuredModel = asString(config.model, "").trim();
+  const ompDbPath = path.join(os.homedir(), ".omp", "agent", "agent.db");
+  const hasOmpDb = fs.existsSync(ompDbPath);
+
+  if (!targetIsRemote && (isOmp || hasOmpDb || asString(config.model, "").includes("antigravity"))) {
+    const ompAuth = checkOmpAntigravityCredentials(ompDbPath);
+    if (ompAuth.valid) {
+      checks.push({
+        code: "omp_antigravity_credentials_valid",
+        level: "info",
+        message: "Google Antigravity credentials are valid and unblocked in OMP agent.db.",
+        detail: ompAuth.details,
+      });
+    } else {
+      checks.push({
+        code: "omp_antigravity_credentials_invalid",
+        level: asString(config.model, "").includes("antigravity") ? "error" : "warn",
+        message: ompAuth.details || ompAuth.error || "Google Antigravity credentials invalid or blocked.",
+        hint: "Authenticate via OMP CLI or refresh tokens in ~/.omp/agent/agent.db.",
+      });
+    }
+  }
+
+  const configuredModel = asString(
+    config.model,
+    isOmp ? "google-antigravity/gemini-3.8-flash" : "",
+  ).trim();
   if (!configuredModel) {
     checks.push({
       code: "pi_model_required",

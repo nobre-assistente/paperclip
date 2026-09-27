@@ -26,7 +26,7 @@ Core fields:
 - promptTemplate (string, optional): user prompt template passed via -p flag
 - model (string, required): Pi model id in provider/model format (for example xai/grok-4)
 - thinking (string, optional): thinking level (off, minimal, low, medium, high, xhigh)
-- command (string, optional): defaults to "pi"
+- command (string, optional): defaults to "omp" (or "pi" if installed)
 - env (object, optional): KEY=VALUE environment variables
 
 Operational fields:
@@ -34,7 +34,7 @@ Operational fields:
 - graceSec (number, optional): SIGTERM grace period in seconds
 
 Notes:
-- Pi supports multiple providers and models. Use \`pi --list-models\` to list available options.
+- Pi supports multiple providers and models. Use \`omp models\` or \`pi --list-models\` to list available options.
 - Paperclip requires an explicit \`model\` value for \`pi_local\` agents.
 - Sessions are stored in ~/.pi/paperclips/ and resumed with --session.
 - All tools (read, bash, edit, write, grep, find, ls) are enabled by default.

@@ -21,16 +21,19 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
+export { CONNECT_SOURCE_NAMES } from "../AdapterLoginChrome";
+
 export function aiProviderForAdapter(
   adapterType: string,
-): AiProvider | undefined {
+): AiProvider | "antigravity" | undefined {
   return (
     {
       claude_local: "anthropic",
       codex_local: "openai",
       opencode_local: "openrouter",
       grok_local: "xai",
-    } as Record<string, AiProvider>
+      pi_local: "antigravity",
+    } as Record<string, AiProvider | "antigravity">
   )[adapterType];
 }
 export function AiConnectionField({

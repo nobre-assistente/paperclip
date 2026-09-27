@@ -50,12 +50,14 @@ export const sessionCodec: AdapterSessionCodec = {
 
 export { execute } from "./execute.js";
 export { listPiSkills, syncPiSkills } from "./skills.js";
-export { testEnvironment } from "./test.js";
+export { testEnvironment, checkOmpAntigravityCredentials } from "./test.js";
 export {
   listPiModels,
   discoverPiModels,
   discoverPiModelsCached,
   ensurePiModelConfiguredAndAvailable,
   resetPiModelsCacheForTests,
+  resolvePiCommand,
+  ANTIGRAVITY_CATALOG_MODELS,
 } from "./models.js";
 export { parsePiJsonl, isPiUnknownSessionError } from "./parse.js";

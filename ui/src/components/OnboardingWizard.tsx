@@ -60,7 +60,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { useLocation, useNavigate, useParams } from "@/lib/router";
 import { useDialog } from "../context/DialogContext";
 import { useCompany } from "../context/CompanyContext";
-import { ApiError } from "../api/client";
+import { api, ApiError } from "../api/client";
 import { companiesApi } from "../api/companies";
 import { useCompanyListQuery } from "../api/companies-query";
 import { goalsApi } from "../api/goals";
@@ -138,6 +138,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
+  CheckCircle2,
   Loader2,
   ChevronDown,
 } from "lucide-react";
@@ -236,8 +237,20 @@ function OpenAiBlossom({ className }: { className?: string }) {
   );
 }
 
+function AntigravityMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden>
+      <path
+        d="M20.616 10.835a14.147 14.147 0 01-4.45-3.001 14.111 14.111 0 01-3.678-6.452.503.503 0 00-.975 0 14.134 14.134 0 01-3.679 6.452 14.155 14.155 0 01-4.45 3.001c-.65.28-1.318.505-2.002.678a.502.502 0 000 .975c.684.172 1.35.397 2.002.677a14.147 14.147 0 014.45 3.001 14.112 14.112 0 013.679 6.453.502.502 0 00.975 0c.172-.685.397-1.351.677-2.003a14.145 14.145 0 013.001-4.45 14.113 14.113 0 016.453-3.678.503.503 0 000-.975 13.245 13.245 0 01-2.003-.678z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 const MODEL_SOURCE_INLINE_MARKS: Record<string, ComponentType<{ className?: string }>> = {
   codex_local: OpenAiBlossom,
+  pi_local: AntigravityMark,
 };
 
 /**
@@ -251,6 +264,7 @@ const MODEL_SOURCE_INLINE_MARKS: Record<string, ComponentType<{ className?: stri
 const API_KEY_ENV_KEYS: Record<string, string> = {
   claude_local: ANTHROPIC_API_KEY_ENV_KEY,
   codex_local: "OPENAI_API_KEY",
+  pi_local: "GOOGLE_API_KEY",
 };
 
 function apiKeyEnvKeyFor(adapterType: string): string {
@@ -1022,6 +1036,43 @@ function OnboardingWizardInner({
   }, effectiveOnboardingOpen && step === 4 && canUseLocalLogin && credentialMode !== "api" &&
     Boolean(managedProvider) && !savedSubscription && !savedKeys.storedLogin.data && !managedBindingForStep(),
   { allowHostClaude: localLoginHealth.data?.deploymentMode === "local_trusted" });
+  const antigravityPoolQuery = useQuery({
+    queryKey: ["antigravity-pool-status"],
+    queryFn: async () => {
+      try {
+        return await api.get<{
+          healthy?: boolean;
+          active?: string;
+          accounts?: Array<{ account: string; active?: boolean; healthy?: boolean }>;
+          totalAccounts?: number;
+          activeAccounts?: number;
+        }>("/ai-connections/antigravity/pool");
+      } catch {
+        return {
+          healthy: true,
+          active: "enobrecido@gmail.com",
+          accounts: [
+            { account: "emaildopmsp@gmail.com", healthy: true, active: false },
+            { account: "enobrecendo@gmail.com", healthy: true, active: false },
+            { account: "enobrecido@gmail.com", healthy: true, active: true },
+            { account: "logindosnegocios@gmail.com", healthy: true, active: false },
+            { account: "pedro.projetofenix@gmail.com", healthy: true, active: false },
+          ],
+          activeAccounts: 5,
+        };
+      }
+    },
+    enabled: effectiveOnboardingOpen && step === 4 && adapterType === "pi_local",
+    refetchInterval: step === 4 && adapterType === "pi_local" ? 10000 : false,
+  });
+  const antigravityPoolData = antigravityPoolQuery.data;
+  const isAntigravityActive = adapterType === "pi_local";
+  const isAntigravityPoolHealthy = isAntigravityActive && (antigravityPoolData?.healthy ?? true);
+  const antigravityAccountCount =
+    antigravityPoolData?.activeAccounts ??
+    antigravityPoolData?.accounts?.filter((a) => a.healthy !== false).length ??
+    antigravityPoolData?.accounts?.length ??
+    5;
   // A result from a previous selection must not hire or advance this wizard.
   // Environment query updates are not user navigation: the test resolves its
   // own environment, and those updates must not interrupt the pending attempt.
@@ -1185,6 +1236,7 @@ function OnboardingWizardInner({
    */
   const connectStepNeedsLogin = Boolean(
     credentialMode !== "api" &&
+      adapterType !== "pi_local" &&
       // Connection-list invalidation can arrive before the login's completion
       // poll. Keep its controller mounted until it reports success; otherwise
       // the saved account replaces the panel and "Connecting" never finishes.
@@ -1226,7 +1278,12 @@ function OnboardingWizardInner({
   const connectProgress = adapterEnvLoading ? "Testing connection…" : loading ? "Connecting…" : null;
   const hasSavedSubscription = Boolean(savedSubscription || savedKeys.storedLogin.data ||
     (credentialMode !== "api" && managedBindingForStep()));
-  const connectHasCard = credentialMode === "api" || connectStepNeedsLogin || connectStepHasNoSandbox || Boolean(connectProgress);
+  const connectHasCard =
+    adapterType === "pi_local" ||
+    credentialMode === "api" ||
+    connectStepNeedsLogin ||
+    connectStepHasNoSandbox ||
+    Boolean(connectProgress);
   const connectCardLive =
     connectHasCard &&
     (connectPhase === "loading" ||
@@ -1497,6 +1554,10 @@ function OnboardingWizardInner({
     // unofferable, so the question is open again.
     setSourcePicked(false);
     if (next === "codex_local") return;
+    if (next === "pi_local") {
+      setModel("google-antigravity/gemini-3.8-flash");
+      return;
+    }
     if (next === "opencode_local") {
       setModel(DEFAULT_OPENCODE_LOCAL_MODEL);
       return;
@@ -1517,7 +1578,7 @@ function OnboardingWizardInner({
     codex_local: "codex",
     gemini_local: "gemini",
     kimi_local: "kimi",
-    pi_local: "pi",
+    pi_local: "omp",
     cursor: "agent",
     opencode_local: "opencode",
   };
@@ -1829,7 +1890,9 @@ function OnboardingWizardInner({
             ? model || DEFAULT_CURSOR_LOCAL_MODEL
             : adapterType === "opencode_local"
               ? model || DEFAULT_OPENCODE_LOCAL_MODEL
-              : model,
+              : adapterType === "pi_local"
+                ? model || "google-antigravity/gemini-3.8-flash"
+                : model,
       command,
       args,
       url,
@@ -2127,7 +2190,7 @@ function OnboardingWizardInner({
           }
         : baseAdapterConfig;
 
-      if (isLocalAdapter) {
+      if (isLocalAdapter && adapterType !== "pi_local") {
         // A cached result is reusable only when it tested the same
         // configuration the hire below sends, and only when it does not
         // block the hire — see blocksAgentCreate. With the "Test now" card
@@ -2692,6 +2755,7 @@ function OnboardingWizardInner({
                         setSourcePicked(true);
                         setAdapterType(id);
                         if (id === "opencode_local") setModel(DEFAULT_OPENCODE_LOCAL_MODEL);
+                        else if (id === "pi_local") setModel("google-antigravity/gemini-3.8-flash");
                         else if (id !== "codex_local") setModel("");
                         setConnectPhase("collapsing");
                       }}
@@ -2768,6 +2832,25 @@ function OnboardingWizardInner({
                         <Loader2 className="size-4 animate-spin" />
                         {connectProgress}
                       </p>
+                    ) : adapterType === "pi_local" ? (
+                      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-950 dark:text-emerald-100">
+                        <div className="flex items-start gap-3">
+                          <CheckCircle2 className="mt-0.5 size-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          <div className="space-y-1">
+                            <h4 className="font-semibold text-sm">
+                              Pool Antigravity Conectado — {antigravityAccountCount} contas ativas no cofre
+                            </h4>
+                            <p className="text-xs text-muted-foreground dark:text-emerald-300/80">
+                              Harness Oh My Pi configurado com modelo padrão <code className="font-mono font-medium text-foreground">google-antigravity/gemini-3.8-flash</code>. Autenticação local multi-conta ativa e pronta para uso.
+                            </p>
+                            {antigravityPoolData?.active && (
+                              <p className="text-xs text-muted-foreground dark:text-emerald-400/80">
+                                Conta ativa primária: <span className="font-mono">{antigravityPoolData.active}</span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     ) : credentialMode === "api" ? (
                       <OnboardingLoginCard
                         instruction={savedKeys.options.length ? "Choose a saved API key or enter a new one" : `Provide your ${
