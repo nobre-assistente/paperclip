@@ -3,6 +3,7 @@ const CLOUD_ADAPTERS = new Set([
   "codex_local",
   "opencode_local",
   "grok_local",
+  "langgraph",
 ]);
 
 /** Creation policy shared by the picker and direct setup links. */

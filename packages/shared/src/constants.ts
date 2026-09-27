@@ -40,6 +40,7 @@ export const AGENT_ADAPTER_TYPES = [
   "pi_local",
   "cursor",
   "openclaw_gateway",
+  "langgraph",
 ] as const;
 export type AgentAdapterType = (typeof AGENT_ADAPTER_TYPES)[number] | (string & {});
 
@@ -56,6 +57,28 @@ export const AGENT_ROLES = [
   "devops",
   "researcher",
   "general",
+  // Fênix specialist roles
+  "solution_architect",
+  "api_contract",
+  "uiux",
+  "copywriter",
+  "growth",
+  "seo",
+  "paid_traffic",
+  "localization",
+  "data_analyst",
+  "crm",
+  "graphic_designer",
+  "dpo",
+  "accessibility",
+  "model_risk",
+  "frontend",
+  "backend",
+  "code_qa",
+  "brand_sentinel",
+  "legal_security",
+  "lead",
+  "software_engineer",
 ] as const;
 export type AgentRole = (typeof AGENT_ROLES)[number];
 
@@ -72,6 +95,27 @@ export const AGENT_ROLE_LABELS: Record<AgentRole, string> = {
   devops: "DevOps",
   researcher: "Researcher",
   general: "General",
+  solution_architect: "Solution Architect Senior",
+  api_contract: "API Contract Engineer",
+  uiux: "UI/UX Design Systems Lead",
+  copywriter: "Senior Copywriter & UX Writer",
+  growth: "Growth & Product Strategy Senior",
+  seo: "Technical SEO Specialist",
+  paid_traffic: "Paid Acquisition Strategist",
+  localization: "Localization & i18n Engineer",
+  data_analyst: "Data Analyst & Telemetry Engineer",
+  crm: "CRM & Lifecycle Operations Lead",
+  graphic_designer: "Graphic & Visual Designer",
+  dpo: "Data Protection Officer (LGPD/GDPR)",
+  accessibility: "Accessibility (a11y) Specialist",
+  model_risk: "Model Risk & AI Safety Auditor",
+  frontend: "Frontend Senior Engineer",
+  backend: "Backend Senior Engineer",
+  code_qa: "Code QA & Test Architect",
+  brand_sentinel: "Brand Sentinel & Compliance Gate",
+  legal_security: "Legal & Information Security Officer",
+  lead: "Lead / Solution Architect",
+  software_engineer: "Software Engineer",
 };
 
 export const AGENT_DEFAULT_MAX_CONCURRENT_RUNS = 20;

@@ -2163,6 +2163,9 @@ export function agentRoutes(
     if (!adapterType) {
       throw unprocessable("Adapter type is required");
     }
+    if (adapterType === "langgraph") {
+      return adapterType;
+    }
     if (!findServerAdapter(adapterType)) {
       throw unprocessable(`Unknown adapter type: ${adapterType}`);
     }
@@ -2188,6 +2191,9 @@ export function agentRoutes(
    */
   async function assertSelectableAdapterType(type: string | null | undefined): Promise<string> {
     const adapterType = assertKnownAdapterType(type);
+    if (adapterType === "langgraph") {
+      return adapterType;
+    }
     if (adapterType === "paperclip_runner") {
       const experimental = await instanceSettings.getExperimental();
       if (experimental.enableNativeRunner !== true) {
@@ -3343,7 +3349,14 @@ export function agentRoutes(
       return result;
     }
     if (!result.checks.some(check => check.code.includes("hello_probe"))) {
-      const providerAdapter = { anthropic: "claude_local", openai: "codex_local", openrouter: "opencode_local", xai: "grok_local" }[binding.provider];
+      const providerAdapters: Record<string, string> = {
+        anthropic: "claude_local",
+        openai: "codex_local",
+        openrouter: "opencode_local",
+        xai: "grok_local",
+        antigravity: "pi_local",
+      };
+      const providerAdapter = providerAdapters[binding.provider] ?? "opencode_local";
       const probe = await requireServerAdapter(providerAdapter).testEnvironment({ ...context, adapterType: providerAdapter, config: { ...context.config, engine: "cli" } });
       result.checks.push(...probe.checks);
       result.status = probe.status === "fail" ? "fail" : result.status === "warn" || probe.status === "warn" ? "warn" : "pass";

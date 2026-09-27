@@ -1,0 +1,161 @@
+{
+  "work_item": "WI-13-003",
+  "issue": "FEA-431",
+  "title": "Criação Dinâmica de Agentes Fênix na UI do Paperclip (Presets e Desbloqueio de Sandbox)",
+  "timestamp": "2026-09-27T15:55:00.000Z",
+  "company_id": "f1453093-9739-4dc9-a6c2-522abef97d3b",
+  "company_name": "FEA - Genesis",
+  "verdict": "PASS",
+  "frontend_changes": {
+    "adapter_display_registry": {
+      "file": "ui/src/adapters/adapter-display-registry.ts",
+      "adapterType": "langgraph",
+      "label": "Fênix Specialist (LangGraph)",
+      "description": "LangGraph orchestration runtime for Fênix specialists",
+      "recommended": true
+    },
+    "new_agent_adapters": {
+      "file": "ui/src/lib/new-agent-adapters.ts",
+      "allowedInCloud": true,
+      "allowedInLocal": true
+    },
+    "langgraph_ui_adapter": {
+      "files": [
+        "ui/src/adapters/langgraph/index.ts",
+        "ui/src/adapters/langgraph/config-fields.tsx",
+        "ui/src/adapters/registry.ts"
+      ],
+      "registered": true
+    },
+    "agent_basics_dialog": {
+      "file": "ui/src/components/new-agent/AgentBasicsDialog.tsx",
+      "presetsCount": 20,
+      "autoFillFields": [
+        "name",
+        "role",
+        "title",
+        "icon",
+        "adapterType",
+        "assistantId",
+        "baseUrl"
+      ]
+    },
+    "new_agent_setup": {
+      "file": "ui/src/components/new-agent/NewAgentSetup.tsx",
+      "presetsSelector": true,
+      "localLangGraphSandboxBypass": true,
+      "directCreationWithoutExternalApiKeys": true
+    }
+  },
+  "backend_changes": {
+    "agents_route": {
+      "file": "server/src/routes/agents.ts",
+      "functions": [
+        "assertKnownAdapterType",
+        "assertSelectableAdapterType"
+      ],
+      "langgraphFirstClass": true
+    },
+    "shared_package": {
+      "files": [
+        "packages/shared/src/fenix-presets.ts",
+        "packages/shared/src/constants.ts",
+        "packages/shared/src/index.ts"
+      ],
+      "presetsExported": "FENIX_SPECIALIST_PRESETS"
+    }
+  },
+  "validation_checks": {
+    "shared_typecheck": "PASS (0 errors)",
+    "adapter_langgraph_typecheck": "PASS (0 errors)",
+    "server_typecheck": "PASS (0 errors)",
+    "ui_typecheck": "PASS (0 errors)",
+    "ui_unit_tests": "PASS (adapter-display-registry.test.ts, registry.test.ts)",
+    "server_unit_tests": "PASS (src/adapters/registry.test.ts - 31/31 passed)",
+    "anti_hermes_gate": "PASS (4/4 gates clean)"
+  },
+  "api_post_validation": {
+    "port_3100_live_genesis": {
+      "endpoint": "POST http://127.0.0.1:3100/api/companies/f1453093-9739-4dc9-a6c2-522abef97d3b/agents",
+      "http_status": 201,
+      "request_payload": {
+        "name": "Fênix — DevOps Specialist (Dynamic Test)",
+        "role": "devops",
+        "title": "DevOps Specialist",
+        "icon": "terminal",
+        "adapterType": "langgraph",
+        "adapterConfig": {
+          "baseUrl": "http://127.0.0.1:2024",
+          "assistantId": "devops"
+        }
+      },
+      "response_body": {
+        "id": "64df8d81-3f82-4273-a97c-653422ecb855",
+        "companyId": "f1453093-9739-4dc9-a6c2-522abef97d3b",
+        "name": "Fênix — DevOps Specialist (Dynamic Test)",
+        "role": "devops",
+        "title": "DevOps Specialist",
+        "icon": "terminal",
+        "status": "idle",
+        "adapterType": "langgraph",
+        "adapterConfig": {
+          "baseUrl": "http://127.0.0.1:2024",
+          "assistantId": "devops"
+        }
+      }
+    },
+    "port_3105_workspace_server": {
+      "endpoint": "POST http://127.0.0.1:3105/api/companies/f1453093-9739-4dc9-a6c2-522abef97d3b/agents",
+      "http_status": 201,
+      "created_agents": [
+        {
+          "id": "4c00da28-fced-4a72-859f-d0b1593ae6b5",
+          "name": "Fênix — DevOps Specialist",
+          "role": "devops",
+          "title": "DevOps Specialist",
+          "icon": "terminal",
+          "adapterType": "langgraph",
+          "adapterConfig": {
+            "baseUrl": "http://127.0.0.1:2024",
+            "assistantId": "devops"
+          }
+        },
+        {
+          "id": "da160872-65f5-4425-8652-6d71bae63d7b",
+          "name": "Fênix — Solution Architect",
+          "role": "solution_architect",
+          "title": "Solution Architect Senior",
+          "icon": "brain",
+          "adapterType": "langgraph",
+          "adapterConfig": {
+            "baseUrl": "http://127.0.0.1:2024",
+            "assistantId": "solution_architect"
+          }
+        }
+      ]
+    }
+  },
+  "presets_count": 20,
+  "presets": [
+    { "id": "solution_architect", "name": "Fênix — Solution Architect", "role": "solution_architect", "title": "Solution Architect Senior", "icon": "brain", "assistantId": "solution_architect" },
+    { "id": "api_contract", "name": "Fênix — API Contract Specialist", "role": "api_contract", "title": "API Contract Engineer", "icon": "file-code", "assistantId": "api_contract" },
+    { "id": "uiux", "name": "Fênix — UI/UX Specialist", "role": "uiux", "title": "UI/UX Design Systems Lead", "icon": "sparkles", "assistantId": "uiux" },
+    { "id": "devops", "name": "Fênix — DevOps Specialist", "role": "devops", "title": "DevOps Specialist", "icon": "terminal", "assistantId": "devops" },
+    { "id": "copywriter", "name": "Fênix — Copywriter Specialist", "role": "copywriter", "title": "Senior Copywriter & UX Writer", "icon": "message-square", "assistantId": "copywriter" },
+    { "id": "growth", "name": "Fênix — Growth Specialist", "role": "growth", "title": "Growth & Product Strategy Senior", "icon": "rocket", "assistantId": "growth" },
+    { "id": "seo", "name": "Fênix — SEO Specialist", "role": "seo", "title": "Technical SEO Specialist", "icon": "search", "assistantId": "seo" },
+    { "id": "paid_traffic", "name": "Fênix — Paid Traffic Specialist", "role": "paid_traffic", "title": "Paid Acquisition Strategist", "icon": "target", "assistantId": "paid_traffic" },
+    { "id": "localization", "name": "Fênix — Localization Specialist", "role": "localization", "title": "Localization & i18n Engineer", "icon": "globe", "assistantId": "localization" },
+    { "id": "data_analyst", "name": "Fênix — Data Analyst Specialist", "role": "data_analyst", "title": "Data Analyst & Telemetry Engineer", "icon": "database", "assistantId": "data_analyst" },
+    { "id": "crm", "name": "Fênix — CRM Specialist", "role": "crm", "title": "CRM & Lifecycle Operations Lead", "icon": "mail", "assistantId": "crm" },
+    { "id": "graphic_designer", "name": "Fênix — Graphic Designer", "role": "graphic_designer", "title": "Graphic & Visual Designer", "icon": "gem", "assistantId": "graphic_designer" },
+    { "id": "dpo", "name": "Fênix — DPO Specialist", "role": "dpo", "title": "Data Protection Officer (LGPD/GDPR)", "icon": "shield", "assistantId": "dpo" },
+    { "id": "accessibility", "name": "Fênix — Accessibility Specialist", "role": "accessibility", "title": "Accessibility (a11y) Specialist", "icon": "eye", "assistantId": "accessibility" },
+    { "id": "model_risk", "name": "Fênix — Model Risk Specialist", "role": "model_risk", "title": "Model Risk & AI Safety Auditor", "icon": "radar", "assistantId": "model_risk" },
+    { "id": "frontend", "name": "Fênix — Frontend Senior Engineer", "role": "frontend", "title": "Frontend Senior Engineer", "icon": "code", "assistantId": "frontend" },
+    { "id": "backend", "name": "Fênix — Backend Senior Engineer", "role": "backend", "title": "Backend Senior Engineer", "icon": "terminal", "assistantId": "backend" },
+    { "id": "code_qa", "name": "Fênix — Code QA Specialist", "role": "code_qa", "title": "Code QA & Test Architect", "icon": "bug", "assistantId": "code_qa" },
+    { "id": "brand_sentinel", "name": "Fênix — Brand Sentinel", "role": "brand_sentinel", "title": "Brand Sentinel & Compliance Gate", "icon": "crown", "assistantId": "brand_sentinel" },
+    { "id": "legal_security", "name": "Fênix — Legal & Security Specialist", "role": "legal_security", "title": "Legal & Information Security Officer", "icon": "lock", "assistantId": "legal_security" }
+  ]
+}

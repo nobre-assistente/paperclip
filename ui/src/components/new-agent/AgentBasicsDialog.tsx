@@ -19,11 +19,17 @@ import {
   DialogDescription,
   DialogTitle,
 } from "../ui/dialog";
+import { FENIX_SPECIALIST_PRESETS, findFenixPreset } from "@paperclipai/shared";
 
 export type AgentBasics = {
   name: string;
   adapterType: string;
   runnerProvider: string;
+  role?: string;
+  title?: string;
+  icon?: string;
+  assistantId?: string;
+  baseUrl?: string;
 };
 const brandMarks: Record<string, { src: string; dark?: string }> = {
   claude_local: { src: "/brands/claude-color.svg" },
@@ -111,6 +117,12 @@ export function AgentBasicsDialog({
   const [name, setName] = useState("");
   const [adapterType, setAdapterType] = useState(initialAdapter);
   const [runnerProvider, setRunnerProvider] = useState("codex");
+  const [selectedPresetId, setSelectedPresetId] = useState("");
+  const [role, setRole] = useState("");
+  const [title, setTitle] = useState("");
+  const [icon, setIcon] = useState("");
+  const [assistantId, setAssistantId] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
   const [step, setStep] = useState<"name" | "adapter">("name");
   const {
     data: adapters,
@@ -169,7 +181,16 @@ export function AgentBasicsDialog({
             if (!name.trim()) return;
             if (step === "name") setStep("adapter");
             else if (validAdapter)
-              onContinue({ name: name.trim(), adapterType, runnerProvider });
+              onContinue({
+                name: name.trim(),
+                adapterType,
+                runnerProvider,
+                ...(role ? { role } : {}),
+                ...(title ? { title } : {}),
+                ...(icon ? { icon } : {}),
+                ...(assistantId ? { assistantId } : {}),
+                ...(baseUrl ? { baseUrl } : {}),
+              });
           }}
         >
           <div className="flex min-h-0 flex-col gap-7 overflow-y-auto px-6 pb-8 sm:px-10">
@@ -202,6 +223,36 @@ export function AgentBasicsDialog({
                   onChange={(event) => setName(event.target.value)}
                   className="h-12 text-base"
                 />
+                <div className="pt-2">
+                  <label htmlFor="fenix-preset-name-select" className="text-xs font-medium text-muted-foreground">
+                    Or choose a Fênix Specialist Preset (20 available)
+                  </label>
+                  <select
+                    id="fenix-preset-name-select"
+                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    value={selectedPresetId}
+                    onChange={(e) => {
+                      const preset = findFenixPreset(e.target.value);
+                      if (preset) {
+                        setSelectedPresetId(preset.id);
+                        setName(preset.name);
+                        setAdapterType("langgraph");
+                        setRole(preset.role);
+                        setTitle(preset.title);
+                        setIcon(preset.icon);
+                        setAssistantId(preset.adapterConfig.assistantId);
+                        setBaseUrl(preset.adapterConfig.baseUrl);
+                      }
+                    }}
+                  >
+                    <option value="">-- Choose a Fênix Specialist --</option>
+                    {FENIX_SPECIALIST_PRESETS.map((preset) => (
+                      <option key={preset.id} value={preset.id}>
+                        {preset.title} ({preset.name})
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 {onInvite && (
                   <Button
                     type="button"
@@ -262,6 +313,44 @@ export function AgentBasicsDialog({
                     );
                   })}
                 </div>
+                {validAdapter && adapterType === "langgraph" && (
+                  <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3 text-sm">
+                    <label htmlFor="fenix-adapter-preset-select" className="font-medium">
+                      Fênix Specialist Preset
+                    </label>
+                    <select
+                      id="fenix-adapter-preset-select"
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      value={selectedPresetId}
+                      onChange={(e) => {
+                        const preset = findFenixPreset(e.target.value);
+                        if (preset) {
+                          setSelectedPresetId(preset.id);
+                          if (!name || name === "e.g. Darnold" || FENIX_SPECIALIST_PRESETS.some((p) => p.name === name)) {
+                            setName(preset.name);
+                          }
+                          setRole(preset.role);
+                          setTitle(preset.title);
+                          setIcon(preset.icon);
+                          setAssistantId(preset.adapterConfig.assistantId);
+                          setBaseUrl(preset.adapterConfig.baseUrl);
+                        }
+                      }}
+                    >
+                      <option value="">-- Select Fênix Specialist (20 available) --</option>
+                      {FENIX_SPECIALIST_PRESETS.map((preset) => (
+                        <option key={preset.id} value={preset.id}>
+                          {preset.title} ({preset.name})
+                        </option>
+                      ))}
+                    </select>
+                    {selectedPresetId && (
+                      <p className="text-xs text-muted-foreground">
+                        {findFenixPreset(selectedPresetId)?.description}
+                      </p>
+                    )}
+                  </div>
+                )}
                 {validAdapter && adapterType === "paperclip_runner" && (
                   <label className="flex flex-col gap-2 text-sm font-medium">
                     Runner

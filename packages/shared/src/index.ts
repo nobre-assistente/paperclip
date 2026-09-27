@@ -1,5 +1,10 @@
 export { agentAdapterTypeSchema, optionalAgentAdapterTypeSchema } from "./adapter-type.js";
 export {
+  FENIX_SPECIALIST_PRESETS,
+  findFenixPreset,
+  type FenixSpecialistPreset,
+} from "./fenix-presets.js";
+export {
   RUNNER_GOAL_MAX_OBJECTIVE_CHARS,
   runnerGoalAvailabilitySchema,
   runnerGoalCapabilityActionSchema,
