@@ -93,16 +93,10 @@ export function Canvas() {
   }, [agents]);
 
   const defaultAssistantId = useMemo(() => {
-    if (urlAssistantId) return urlAssistantId;
-    if (langgraphAgents.length > 0) {
-      const first = langgraphAgents[0];
-      const config = first.adapterConfig as Record<string, unknown> | null;
-      return (typeof config?.assistantId === "string" && config.assistantId.trim())
-        ? config.assistantId.trim()
-        : first.id;
-    }
+    if (urlAssistantId && urlAssistantId.trim().length > 0) return urlAssistantId.trim();
+    // O macro-grafo consolidado é sempre "orchestrator"
     return "orchestrator";
-  }, [urlAssistantId, langgraphAgents]);
+  }, [urlAssistantId]);
 
   const [inputAssistantId, setInputAssistantId] = useState(defaultAssistantId);
   const [activeAssistantId, setActiveAssistantId] = useState(defaultAssistantId);
@@ -546,7 +540,19 @@ export function Canvas() {
                     variant={isSelected ? "secondary" : "outline"}
                     size="sm"
                     className="text-xs h-8"
-                    onClick={() => handleSelectAgent(asstId)}
+                    onClick={() => {
+                      // Ao clicar no agente, seleciona e foca seu nó no Canvas
+                      const meta = (agent.metadata ?? {}) as Record<string, unknown>;
+                      const cfg = (agent.adapterConfig ?? {}) as Record<string, unknown>;
+                      const targetNode =
+                        (typeof meta.cargoName === "string" && meta.cargoName) ||
+                        (typeof cfg.assistantId === "string" && cfg.assistantId) ||
+                        agent.name.toLowerCase().replace(/fênix\s*—\s*/i, "").replace(/\s+/g, "_");
+                      setSelectedNodeId(targetNode);
+                      if (activeAssistantId !== "orchestrator") {
+                        handleSelectAgent("orchestrator");
+                      }
+                    }}
                   >
                     {agent.name}
                   </Button>
