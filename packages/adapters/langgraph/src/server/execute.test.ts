@@ -793,6 +793,161 @@ describe("execute()", () => {
     expect(result.errorMessage).toContain("missing or invalid resume-token");
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("passes specialist contract and LLM configuration into inputPayload and config.configurable", async () => {
+    let capturedRunBody = "";
+    const fetchMock = vi.fn().mockImplementation((input: string | URL | Request, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url.endsWith("/threads")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ thread_id: "thread-specialist-1" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+
+      if (url.includes("/runs/wait")) {
+        capturedRunBody = typeof init?.body === "string" ? init.body : "";
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              run_id: "run-spec-1",
+              thread_id: "thread-specialist-1",
+              status: "success",
+              values: {
+                summary: "DevOps infrastructure verified.",
+              },
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response("Not found", { status: 404 }));
+    });
+
+    globalThis.fetch = fetchMock;
+
+    const ctx = createTestContext({
+      config: {
+        baseUrl: "http://127.0.0.1:2024",
+        assistantId: "devops",
+        model: "google-antigravity/gemini-3.8-flash",
+        temperature: 0.2,
+        systemPrompt: "You are the canonical DevOps specialist for Fênix.",
+        specialistContract: {
+          rto_seconds: 120,
+          rpo_seconds: 30,
+          infrastructure_profile: "swarm",
+          policy_strictness: "strict",
+          deploy_strategy: "rolling",
+        },
+      },
+    });
+
+    const result = await execute(ctx);
+    expect(result.exitCode).toBe(0);
+
+    const parsed = JSON.parse(capturedRunBody);
+    expect(parsed.input?.specialist_contract).toEqual({
+      rto_seconds: 120,
+      rpo_seconds: 30,
+      infrastructure_profile: "swarm",
+      policy_strictness: "strict",
+      deploy_strategy: "rolling",
+    });
+    expect(parsed.input?.model).toBe("google-antigravity/gemini-3.8-flash");
+    expect(parsed.input?.temperature).toBe(0.2);
+    expect(parsed.input?.system_prompt).toBe("You are the canonical DevOps specialist for Fênix.");
+    expect(parsed.input?.rto_seconds).toBe(120);
+    expect(parsed.input?.infrastructure_profile).toBe("swarm");
+
+    expect(parsed.config?.configurable?.rto_seconds).toBe(120);
+    expect(parsed.config?.configurable?.model).toBe("google-antigravity/gemini-3.8-flash");
+    expect(parsed.config?.configurable?.temperature).toBe(0.2);
+    expect(parsed.config?.configurable?.system_prompt).toBe("You are the canonical DevOps specialist for Fênix.");
+    expect(parsed.context?.specialist_contract).toBeDefined();
+  });
+
+  it("passes specialist contract from agent metadata into inputPayload and config", async () => {
+    let capturedRunBody = "";
+    const fetchMock = vi.fn().mockImplementation((input: string | URL | Request, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url.endsWith("/threads")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ thread_id: "thread-meta-1" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+
+      if (url.includes("/runs/wait")) {
+        capturedRunBody = typeof init?.body === "string" ? init.body : "";
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              run_id: "run-meta-1",
+              thread_id: "thread-meta-1",
+              status: "success",
+              values: {
+                summary: "Solution architecture verified.",
+              },
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response("Not found", { status: 404 }));
+    });
+
+    globalThis.fetch = fetchMock;
+
+    const ctx = createTestContext({
+      agent: {
+        id: "agent-sa",
+        companyId: "company-real-tenant",
+        name: "Fênix — Solution Architect",
+        adapterType: "langgraph",
+        adapterConfig: {},
+        metadata: {
+          cargo: 1,
+          cargoName: "solution_architect",
+          specialistContract: {
+            target_audience: "enterprise",
+            architecture_style: "event_driven",
+            compliance_frameworks: ["lgpd", "soc2", "iso27001"],
+          },
+        },
+      } as unknown as AdapterExecutionContext["agent"],
+      config: {
+        baseUrl: "http://127.0.0.1:2024",
+        assistantId: "solution_architect",
+      },
+    });
+
+    const result = await execute(ctx);
+    expect(result.exitCode).toBe(0);
+
+    const parsed = JSON.parse(capturedRunBody);
+    expect(parsed.input?.specialist_contract).toEqual({
+      target_audience: "enterprise",
+      architecture_style: "event_driven",
+      compliance_frameworks: ["lgpd", "soc2", "iso27001"],
+    });
+    expect(parsed.input?.target_audience).toBe("enterprise");
+    expect(parsed.config?.configurable?.target_audience).toBe("enterprise");
+  });
 });
 
 describe("toQuestionSet() and extractInterrupt()", () => {

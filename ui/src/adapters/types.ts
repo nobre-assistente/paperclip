@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import type { CreateConfigValues } from "@paperclipai/adapter-utils";
+import type { Agent } from "@paperclipai/shared";
 
 // Re-export shared types so local consumers don't need to change imports
 export type { TranscriptEntry, StdoutLineParser, CreateConfigValues } from "@paperclipai/adapter-utils";
@@ -33,9 +34,9 @@ export interface AdapterConfigFieldsProps {
   /** Edit mode: original adapterConfig from agent */
   config: Record<string, unknown>;
   /** Edit mode: read effective value */
-  eff: <T>(group: "adapterConfig", field: string, original: T) => T;
+  eff: <T>(group: "adapterConfig" | "metadata", field: string, original: T) => T;
   /** Edit mode: mark field dirty */
-  mark: (group: "adapterConfig", field: string, value: unknown) => void;
+  mark: (group: "adapterConfig" | "metadata", field: string, value: unknown) => void;
   /** Available models for dropdowns */
   models: { id: string; label: string }[];
   /** When true, hides the instructions file path field (e.g. during import where it's set automatically) */
@@ -49,7 +50,8 @@ export interface AdapterConfigFieldsProps {
    * so a stored path never flashes before the policy resolves.
    */
   managedSandboxOnly?: boolean;
-}
+  /** Agent entity when editing an existing agent */
+  agent?: Agent | null;
 
 export interface UIAdapterModule extends TranscriptParserSource {
   type: string;

@@ -11,10 +11,18 @@ export function buildLangGraphConfig(values: CreateConfigValues): Record<string,
   const baseUrl = (schemaVals.baseUrl as string) || "http://127.0.0.1:2024";
   const assistantId = (schemaVals.assistantId as string) || "devops";
   const runTimeoutMs = schemaVals.runTimeoutMs;
+  const specialistContract = schemaVals.specialistContract;
+  const model = schemaVals.model;
+  const temperature = schemaVals.temperature;
+  const systemPrompt = schemaVals.systemPrompt;
   return {
     baseUrl,
     assistantId,
     ...(runTimeoutMs ? { runTimeoutMs: Number(runTimeoutMs) } : {}),
+    ...(specialistContract ? { specialistContract } : {}),
+    ...(model ? { model } : {}),
+    ...(temperature !== undefined ? { temperature } : {}),
+    ...(systemPrompt ? { systemPrompt } : {}),
     ...(values.dangerouslyBypassSandbox !== undefined ? { dangerouslyBypassSandbox: values.dangerouslyBypassSandbox } : {}),
   };
 }
