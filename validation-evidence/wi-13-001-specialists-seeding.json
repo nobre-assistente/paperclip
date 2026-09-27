@@ -1,0 +1,508 @@
+{
+  "workItemId": "WI-13-001",
+  "youtrackIssue": "FEA-429",
+  "title": "Seeding e Catálogo dos 20 Especialistas da Wave 6 no Paperclip (Personas, Roles e Roteamento LangGraph)",
+  "timestamp": "2026-09-27T05:00:23.719Z",
+  "targetCompany": {
+    "id": "f1453093-9739-4dc9-a6c2-522abef97d3b",
+    "name": "FEA - Genesis"
+  },
+  "verificationVerdict": "PASS",
+  "summary": {
+    "totalAgentsInDatabase": 21,
+    "totalAgentsFromApi": 21,
+    "existingOrchestratorCount": 1,
+    "seededSpecialistsCount": 20,
+    "expectedCount": 21,
+    "idempotencyVerified": true
+  },
+  "sqlVerification": {
+    "query": "SELECT COUNT(*) FROM agents WHERE company_id = 'f1453093-9739-4dc9-a6c2-522abef97d3b';",
+    "resultCount": 21,
+    "agents": [
+      {
+        "id": "587d0d1a-3402-4d7d-a871-5465a425c4b0",
+        "name": "Fenix Orchestrator HITL Agent",
+        "role": "general",
+        "title": "Macro Orchestrator HITL",
+        "status": "error",
+        "reportsTo": null,
+        "adapterType": "langgraph",
+        "assistantId": "orchestrator",
+        "baseUrl": "http://127.0.0.1:2024",
+        "icon": null
+      },
+      {
+        "id": "48644daa-9c89-45b4-bccc-5deedb6baa01",
+        "name": "Fênix — API Contract Specialist",
+        "role": "api_contract",
+        "title": "API Contract Specialist Senior",
+        "status": "idle",
+        "reportsTo": "8e5ee226-c3e9-41e5-8615-9e95d3476790",
+        "adapterType": "langgraph",
+        "assistantId": "api_contract",
+        "baseUrl": "http://127.0.0.1:2024",
+        "icon": "file-code"
+      },
+      {
+        "id": "533e6ccc-0033-4cc1-a616-6857b874b251",
+        "name": "Fênix — Accessibility Senior",
+        "role": "accessibility",
+        "title": "Accessibility Specialist Senior",
+        "status": "idle",
+        "reportsTo": "8e5ee226-c3e9-41e5-8615-9e95d3476790",
+        "adapterType": "langgraph",
+        "assistantId": "accessibility",
+        "baseUrl": "http://127.0.0.1:2024",
+        "icon": "star"
+      },
+      {
+        "id": "ef676df3-35c2-4685-bef2-514996dc2ad3",
+        "name": "Fênix — Backend Senior",
+        "role": "software_engineer",
+        "title": "Tech Lead / Backend Senior",
+        "status": "idle",
+        "reportsTo": "8e5ee226-c3e9-41e5-8615-9e95d3476790",
+        "adapterType": "langgraph",
+        "assistantId": "backend_senior",
+        "baseUrl": "http://127.0.0.1:2024",
+        "icon": "code"
+      },
+      {
+        "id": "ca14e4bc-84f4-4153-8e75-45fea3214420",
+        "name": "Fênix — Brand & Visual Sentinel",
+        "role": "brand_sentinel",
+        "title": "Brand & Visual Sentinel Specialist",
+        "status": "idle",
+        "reportsTo": "8e5ee226-c3e9-41e5-8615-9e95d3476790",
+        "adapterType": "langgraph",
+        "assistantId": "brand_sentinel",
+        "baseUrl": "http://127.0.0.1:2024",
+        "icon": "eye"
+      },
+      {
+        "id": "c569f2cc-2cca-49e5-8cee-eec88a33ed07",
+        "name": "Fênix — CRM Senior",
+        "role": "crm",
+        "title": "CRM & Lifecycle Specialist Senior",
+        "status": "idle",
+        "reportsTo": "8e5ee226-c3e9-41e5-8615-9e95d3476790",
+        "adapterType": "langgraph",
+        "assistantId": "crm",
+        "baseUrl": "http://127.0.0.1:2024",
+        "icon": "heart"
+      },
+      {
+        "id": "1d4592dd-6d0f-4881-9b46-17ebeb1cc9ed",
+        "name": "Fênix — Code QA Specialist",
+        "role": "qa",
+        "title": "QA Automation & Code QA Specialist",
+        "status": "idle",
+        "reportsTo": "8e5ee226-c3e9-41e5-8615-9e95d3476790",
+        "adapterType": "langgraph",
+        "assistantId": "code_qa",
+        "baseUrl": "http://127.0.0.1:2024",
+        "icon": "bug"
+      },
+      {
+        "id": "cd20e0fa-6b30-405a-b45a-2fcc8338cd76",
+        "name": "Fênix — Copywriter Senior",
+        "role": "copywriter",
+        "title": "Copywriter Senior Specialist",
+        "status": "idle",
+        "reportsTo": "8e5ee226-c3e9-41e5-8615-9e95d3476790",
+        "adapterType": "langgraph",
+        "assistantId": "copywriter",
+        "baseUrl": "http://127.0.0.1:2024",
+        "icon": "message-square"
+      },
+      {
+        "id": "7db26700-27b2-4c31-819c-1a82855aa9bc",
+        "name": "Fênix — DPO Senior",
+        "role": "dpo",
+        "title": "Data Protection Officer (DPO) Senior",
+        "status": "idle",
+        "reportsTo": "8e5ee226-c3e9-41e5-8615-9e95d3476790",
+        "adapterType": "langgraph",
+        "assistantId": "dpo",
+        "baseUrl": "http://127.0.0.1:2024",
+        "icon": "shield"
+      },
+      {
+        "id": "02754e2c-ea1a-4116-91f3-e59d72c8292b",
+        "name": "Fênix — Data Analyst Senior",
+        "role": "data_analyst",
+        "title": "Data Analyst Senior Specialist",
+        "status": "idle",
+        "reportsTo": "8e5ee226-c3e9-41e5-8615-9e95d3476790",
+        "adapterType": "langgraph",
+        "assistantId": "data_analyst",
+        "baseUrl": "http://127.0.0.1:2024",
+        "icon": "database"
+      },
+      {
+        "id": "524095c6-2f9f-4e80-aa24-9afe2bba2682",
+        "name": "Fênix — DevOps Specialist",
+        "role": "devops",
+        "title": "DevOps & Infrastructure Specialist",
+        "status": "idle",
+        "reportsTo": "8e5ee226-c3e9-41e5-8615-9e95d3476790",
+        "adapterType": "langgraph",
+        "assistantId": "devops",
+        "baseUrl": "http://127.0.0.1:2024",
+        "icon": "terminal"
+      },
+      {
+        "id": "90e27e22-be5e-4e29-8427-77c11966f1f7",
+        "name": "Fênix — Frontend Senior",
+        "role": "frontend",
+        "title": "Frontend Senior Specialist",
+        "status": "idle",
+        "reportsTo": "8e5ee226-c3e9-41e5-8615-9e95d3476790",
+        "adapterType": "langgraph",
+        "assistantId": "frontend",
+        "baseUrl": "http://127.0.0.1:2024",
+        "icon": "package"
+      },
+      {
+        "id": "53268aae-2cff-4f75-8564-a0aa380d0a95",
+        "name": "Fênix — Graphic Designer Senior",
+        "role": "graphic_designer",
+        "title": "Graphic Designer Senior Specialist",
+        "status": "idle",
+        "reportsTo": "8e5ee226-c3e9-41e5-8615-9e95d3476790",
+        "adapterType": "langgraph",
+        "assistantId": "graphic_designer",
+        "baseUrl": "http://127.0.0.1:2024",
+        "icon": "wand"
+      },
+      {
+        "id": "31f4e558-8756-42cf-88f3-4c983648c996",
+        "name": "Fênix — Growth Marketing Senior",
+        "role": "growth",
+        "title": "Growth Marketing Senior Specialist",
+        "status": "idle",
+        "reportsTo": "8e5ee226-c3e9-41e5-8615-9e95d3476790",
+        "adapterType": "langgraph",
+        "assistantId": "growth",
+        "baseUrl": "http://127.0.0.1:2024",
+        "icon": "rocket"
+      },
+      {
+        "id": "7944dd29-6603-4c5f-9396-ba140eb29be4",
+        "name": "Fênix — Legal & Security Auditor",
+        "role": "security",
+        "title": "Legal & Security Auditor Specialist",
+        "status": "idle",
+        "reportsTo": "8e5ee226-c3e9-41e5-8615-9e95d3476790",
+        "adapterType": "langgraph",
+        "assistantId": "legal_security",
+        "baseUrl": "http://127.0.0.1:2024",
+        "icon": "lock"
+      },
+      {
+        "id": "94fff6dd-f1ae-420d-98a5-8e4c7d913c3d",
+        "name": "Fênix — Localization Senior",
+        "role": "localization",
+        "title": "Internationalization & Localization Senior",
+        "status": "idle",
+        "reportsTo": "8e5ee226-c3e9-41e5-8615-9e95d3476790",
+        "adapterType": "langgraph",
+        "assistantId": "localization",
+        "baseUrl": "http://127.0.0.1:2024",
+        "icon": "globe"
+      },
+      {
+        "id": "edc24079-ea49-496f-865f-a6f6b42c1510",
+        "name": "Fênix — Model Risk Senior",
+        "role": "model_risk",
+        "title": "AI Evaluation & Model Risk Specialist Senior",
+        "status": "idle",
+        "reportsTo": "8e5ee226-c3e9-41e5-8615-9e95d3476790",
+        "adapterType": "langgraph",
+        "assistantId": "model_risk",
+        "baseUrl": "http://127.0.0.1:2024",
+        "icon": "microscope"
+      },
+      {
+        "id": "bece548a-b574-4d59-8b88-7d05133bf865",
+        "name": "Fênix — Paid Traffic Senior",
+        "role": "paid_traffic",
+        "title": "Paid Traffic Senior Specialist",
+        "status": "idle",
+        "reportsTo": "8e5ee226-c3e9-41e5-8615-9e95d3476790",
+        "adapterType": "langgraph",
+        "assistantId": "paid_traffic",
+        "baseUrl": "http://127.0.0.1:2024",
+        "icon": "target"
+      },
+      {
+        "id": "f1ff171d-c21a-4496-b3ac-f5bc78105eb9",
+        "name": "Fênix — SEO Senior",
+        "role": "seo",
+        "title": "SEO Senior Specialist",
+        "status": "idle",
+        "reportsTo": "8e5ee226-c3e9-41e5-8615-9e95d3476790",
+        "adapterType": "langgraph",
+        "assistantId": "seo",
+        "baseUrl": "http://127.0.0.1:2024",
+        "icon": "search"
+      },
+      {
+        "id": "8e5ee226-c3e9-41e5-8615-9e95d3476790",
+        "name": "Fênix — Solution Architect",
+        "role": "lead",
+        "title": "Solution Architect",
+        "status": "idle",
+        "reportsTo": "587d0d1a-3402-4d7d-a871-5465a425c4b0",
+        "adapterType": "langgraph",
+        "assistantId": "solution_architect",
+        "baseUrl": "http://127.0.0.1:2024",
+        "icon": "circuit-board"
+      },
+      {
+        "id": "ecb910d2-706e-4e8e-ac70-c7887964b39b",
+        "name": "Fênix — Web Designer / UI-UX",
+        "role": "designer",
+        "title": "Web Designer & UI-UX Specialist",
+        "status": "idle",
+        "reportsTo": "8e5ee226-c3e9-41e5-8615-9e95d3476790",
+        "adapterType": "langgraph",
+        "assistantId": "uiux",
+        "baseUrl": "http://127.0.0.1:2024",
+        "icon": "sparkles"
+      }
+    ]
+  },
+  "apiVerification": {
+    "endpoint": "/api/companies/f1453093-9739-4dc9-a6c2-522abef97d3b/agents",
+    "status": 200,
+    "agentCount": 21,
+    "agents": [
+      {
+        "id": "524095c6-2f9f-4e80-aa24-9afe2bba2682",
+        "name": "Fênix — DevOps Specialist",
+        "role": "devops",
+        "title": "DevOps & Infrastructure Specialist",
+        "status": "idle",
+        "adapterType": "langgraph",
+        "assistantId": "devops",
+        "icon": "terminal"
+      },
+      {
+        "id": "ecb910d2-706e-4e8e-ac70-c7887964b39b",
+        "name": "Fênix — Web Designer / UI-UX",
+        "role": "designer",
+        "title": "Web Designer & UI-UX Specialist",
+        "status": "idle",
+        "adapterType": "langgraph",
+        "assistantId": "uiux",
+        "icon": "sparkles"
+      },
+      {
+        "id": "8e5ee226-c3e9-41e5-8615-9e95d3476790",
+        "name": "Fênix — Solution Architect",
+        "role": "lead",
+        "title": "Solution Architect",
+        "status": "idle",
+        "adapterType": "langgraph",
+        "assistantId": "solution_architect",
+        "icon": "circuit-board"
+      },
+      {
+        "id": "ef676df3-35c2-4685-bef2-514996dc2ad3",
+        "name": "Fênix — Backend Senior",
+        "role": "software_engineer",
+        "title": "Tech Lead / Backend Senior",
+        "status": "idle",
+        "adapterType": "langgraph",
+        "assistantId": "backend_senior",
+        "icon": "code"
+      },
+      {
+        "id": "587d0d1a-3402-4d7d-a871-5465a425c4b0",
+        "name": "Fenix Orchestrator HITL Agent",
+        "role": "general",
+        "title": "Macro Orchestrator HITL",
+        "status": "error",
+        "adapterType": "langgraph",
+        "assistantId": "orchestrator",
+        "icon": null
+      },
+      {
+        "id": "f1ff171d-c21a-4496-b3ac-f5bc78105eb9",
+        "name": "Fênix — SEO Senior",
+        "role": "seo",
+        "title": "SEO Senior Specialist",
+        "status": "idle",
+        "adapterType": "langgraph",
+        "assistantId": "seo",
+        "icon": "search"
+      },
+      {
+        "id": "bece548a-b574-4d59-8b88-7d05133bf865",
+        "name": "Fênix — Paid Traffic Senior",
+        "role": "paid_traffic",
+        "title": "Paid Traffic Senior Specialist",
+        "status": "idle",
+        "adapterType": "langgraph",
+        "assistantId": "paid_traffic",
+        "icon": "target"
+      },
+      {
+        "id": "1d4592dd-6d0f-4881-9b46-17ebeb1cc9ed",
+        "name": "Fênix — Code QA Specialist",
+        "role": "qa",
+        "title": "QA Automation & Code QA Specialist",
+        "status": "idle",
+        "adapterType": "langgraph",
+        "assistantId": "code_qa",
+        "icon": "bug"
+      },
+      {
+        "id": "ca14e4bc-84f4-4153-8e75-45fea3214420",
+        "name": "Fênix — Brand & Visual Sentinel",
+        "role": "brand_sentinel",
+        "title": "Brand & Visual Sentinel Specialist",
+        "status": "idle",
+        "adapterType": "langgraph",
+        "assistantId": "brand_sentinel",
+        "icon": "eye"
+      },
+      {
+        "id": "7944dd29-6603-4c5f-9396-ba140eb29be4",
+        "name": "Fênix — Legal & Security Auditor",
+        "role": "security",
+        "title": "Legal & Security Auditor Specialist",
+        "status": "idle",
+        "adapterType": "langgraph",
+        "assistantId": "legal_security",
+        "icon": "lock"
+      },
+      {
+        "id": "cd20e0fa-6b30-405a-b45a-2fcc8338cd76",
+        "name": "Fênix — Copywriter Senior",
+        "role": "copywriter",
+        "title": "Copywriter Senior Specialist",
+        "status": "idle",
+        "adapterType": "langgraph",
+        "assistantId": "copywriter",
+        "icon": "message-square"
+      },
+      {
+        "id": "31f4e558-8756-42cf-88f3-4c983648c996",
+        "name": "Fênix — Growth Marketing Senior",
+        "role": "growth",
+        "title": "Growth Marketing Senior Specialist",
+        "status": "idle",
+        "adapterType": "langgraph",
+        "assistantId": "growth",
+        "icon": "rocket"
+      },
+      {
+        "id": "7db26700-27b2-4c31-819c-1a82855aa9bc",
+        "name": "Fênix — DPO Senior",
+        "role": "dpo",
+        "title": "Data Protection Officer (DPO) Senior",
+        "status": "idle",
+        "adapterType": "langgraph",
+        "assistantId": "dpo",
+        "icon": "shield"
+      },
+      {
+        "id": "94fff6dd-f1ae-420d-98a5-8e4c7d913c3d",
+        "name": "Fênix — Localization Senior",
+        "role": "localization",
+        "title": "Internationalization & Localization Senior",
+        "status": "idle",
+        "adapterType": "langgraph",
+        "assistantId": "localization",
+        "icon": "globe"
+      },
+      {
+        "id": "02754e2c-ea1a-4116-91f3-e59d72c8292b",
+        "name": "Fênix — Data Analyst Senior",
+        "role": "data_analyst",
+        "title": "Data Analyst Senior Specialist",
+        "status": "idle",
+        "adapterType": "langgraph",
+        "assistantId": "data_analyst",
+        "icon": "database"
+      },
+      {
+        "id": "c569f2cc-2cca-49e5-8cee-eec88a33ed07",
+        "name": "Fênix — CRM Senior",
+        "role": "crm",
+        "title": "CRM & Lifecycle Specialist Senior",
+        "status": "idle",
+        "adapterType": "langgraph",
+        "assistantId": "crm",
+        "icon": "heart"
+      },
+      {
+        "id": "edc24079-ea49-496f-865f-a6f6b42c1510",
+        "name": "Fênix — Model Risk Senior",
+        "role": "model_risk",
+        "title": "AI Evaluation & Model Risk Specialist Senior",
+        "status": "idle",
+        "adapterType": "langgraph",
+        "assistantId": "model_risk",
+        "icon": "microscope"
+      },
+      {
+        "id": "53268aae-2cff-4f75-8564-a0aa380d0a95",
+        "name": "Fênix — Graphic Designer Senior",
+        "role": "graphic_designer",
+        "title": "Graphic Designer Senior Specialist",
+        "status": "idle",
+        "adapterType": "langgraph",
+        "assistantId": "graphic_designer",
+        "icon": "wand"
+      },
+      {
+        "id": "533e6ccc-0033-4cc1-a616-6857b874b251",
+        "name": "Fênix — Accessibility Senior",
+        "role": "accessibility",
+        "title": "Accessibility Specialist Senior",
+        "status": "idle",
+        "adapterType": "langgraph",
+        "assistantId": "accessibility",
+        "icon": "star"
+      },
+      {
+        "id": "48644daa-9c89-45b4-bccc-5deedb6baa01",
+        "name": "Fênix — API Contract Specialist",
+        "role": "api_contract",
+        "title": "API Contract Specialist Senior",
+        "status": "idle",
+        "adapterType": "langgraph",
+        "assistantId": "api_contract",
+        "icon": "file-code"
+      },
+      {
+        "id": "90e27e22-be5e-4e29-8427-77c11966f1f7",
+        "name": "Fênix — Frontend Senior",
+        "role": "frontend",
+        "title": "Frontend Senior Specialist",
+        "status": "idle",
+        "adapterType": "langgraph",
+        "assistantId": "frontend",
+        "icon": "package"
+      }
+    ]
+  },
+  "orgChartVerification": {
+    "endpoint": "/api/companies/f1453093-9739-4dc9-a6c2-522abef97d3b/org",
+    "status": 200,
+    "rootAgent": {
+      "name": "Fenix Orchestrator HITL Agent",
+      "role": "general",
+      "directReportsCount": 1,
+      "leadSpecialist": {
+        "name": "Fênix — Solution Architect",
+        "role": "lead",
+        "specialistReportsCount": 19
+      }
+    }
+  }
+}
