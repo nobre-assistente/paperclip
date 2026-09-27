@@ -1,0 +1,19 @@
+{
+  "work_item": "WI-13-004",
+  "issue": "FEA-432",
+  "paperclip_issue_id": "7bfd62d1-f105-495c-8dd5-86757f20f194",
+  "paperclip_issue_identifier": "FEA-19",
+  "document_key": "guia-operacional",
+  "document_id": "b9f23c3c-7ba2-41f6-97ce-d57189e839ec",
+  "revision_id": "f239882e-1a30-427a-89c4-c2982bf4a1a8",
+  "revision_number": 4,
+  "company_id": "f1453093-9739-4dc9-a6c2-522abef97d3b",
+  "company_name": "FEA - Genesis",
+  "title": "Guia Operacional — Ecossistema Fênix Enterprise Agents & Paperclip",
+  "format": "markdown",
+  "character_count": 34678,
+  "bytes_length": 36521,
+  "sha256": "ee9624ed82279236944e8f8a5cfe4677e04e578d326be538c1c1ff6f32456b3b",
+  "timestamp": "2026-09-27T04:59:28.340Z",
+  "status": "verified_in_db_and_api"
+}
