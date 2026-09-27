@@ -14,9 +14,21 @@ export function assistantRoutes() {
     const targetUrl = `${baseUrl.replace(/\/+$/, "")}/assistants/${encodeURIComponent(assistantId)}/graph`;
 
     try {
-      const upstreamRes = await fetch(targetUrl, {
+      let upstreamRes = await fetch(targetUrl, {
         headers: { Accept: "application/json" },
       });
+
+      // Fallback gracioso para "orchestrator" se o assistantId for nome/slug de especialista
+      // ou se o LangGraph Server devolver 422 (Unprocessable Entity: ID must be UUID) ou 404
+      if (!upstreamRes.ok && (upstreamRes.status === 422 || upstreamRes.status === 404) && assistantId !== "orchestrator") {
+        const fallbackUrl = `${baseUrl.replace(/\/+$/, "")}/assistants/orchestrator/graph`;
+        const fallbackRes = await fetch(fallbackUrl, {
+          headers: { Accept: "application/json" },
+        });
+        if (fallbackRes.ok) {
+          upstreamRes = fallbackRes;
+        }
+      }
 
       if (!upstreamRes.ok) {
         const errorText = await upstreamRes.text().catch(() => "");
