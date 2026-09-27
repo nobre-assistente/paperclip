@@ -376,13 +376,13 @@ export async function execute(
       : (typeof ctx.context.userPrompt === "string" ? ctx.context.userPrompt :
         (typeof ctx.context.prompt === "string" ? ctx.context.prompt :
         (typeof ctx.context.message === "string" ? ctx.context.message : null)));
-  if (rawMsg && typeof rawMsg === "string" && rawMsg.trim().length > 0) {
-    const trimmed = rawMsg.trim();
-    inputPayload.prompt = trimmed;
-    inputPayload.user_prompt = trimmed;
-    inputPayload.message = trimmed;
-    inputPayload.input = trimmed;
-    inputPayload.messages = [{ role: "user", content: trimmed }];
+  const userMessage = (rawMsg && typeof rawMsg === "string" && rawMsg.trim().length > 0) ? rawMsg.trim() : null;
+  if (userMessage) {
+    inputPayload.prompt = userMessage;
+    inputPayload.user_prompt = userMessage;
+    inputPayload.message = userMessage;
+    inputPayload.input = userMessage;
+    inputPayload.messages = [{ role: "user", content: userMessage }];
   }
 
   const requestContext: Record<string, JsonValue> = {
@@ -622,7 +622,12 @@ export async function execute(
     }
 
     const usage = extractUsage(runData);
-    const summary = extractSummary(runData);
+    let summary: string | undefined = extractSummary(runData);
+
+    // Suprimir comentário em disparos periódicos de timer (evita poluição a cada 30s)
+    if (ctx.context.wakeReason === "heartbeat_timer" && !userMessage) {
+      summary = undefined;
+    }
 
     await ctx.onLog(
       "stdout",
