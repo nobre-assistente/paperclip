@@ -51,7 +51,7 @@ function extractUsage(runResponse: LangGraphRunResponse): UsageSummary | undefin
 
 function extractSummary(runResponse: LangGraphRunResponse): string {
   if (runResponse.values && typeof runResponse.values === "object") {
-    const vals = runResponse.values;
+    const vals = runResponse.values as Record<string, unknown>;
     if (typeof vals.summary === "string" && vals.summary.trim().length > 0) {
       return vals.summary.trim();
     }
@@ -59,18 +59,28 @@ function extractSummary(runResponse: LangGraphRunResponse): string {
       return vals.output.trim();
     }
     if (Array.isArray(vals.messages) && vals.messages.length > 0) {
-      const lastMsg = vals.messages[vals.messages.length - 1];
-      if (
-        lastMsg &&
-        typeof lastMsg === "object" &&
-        !Array.isArray(lastMsg) &&
-        typeof lastMsg.content === "string"
-      ) {
-        return lastMsg.content.trim();
+      for (let i = vals.messages.length - 1; i >= 0; i--) {
+        const msg = vals.messages[i] as Record<string, unknown>;
+        if (msg && typeof msg === "object") {
+          const content = msg.content ?? msg.text;
+          if (typeof content === "string" && content.trim().length > 0) {
+            return content.trim();
+          }
+          if (Array.isArray(content)) {
+            const parts = content.map((p: any) => typeof p === "string" ? p : (p?.text || "")).filter(Boolean);
+            if (parts.length > 0) return parts.join(" ").trim();
+          }
+        }
+      }
+    }
+    if (vals.artifacts && typeof vals.artifacts === "object") {
+      const arts = Object.keys(vals.artifacts as Record<string, unknown>);
+      if (arts.length > 0) {
+        return `Execucao concluida. Artefatos gerados: ${arts.join(", ")}`;
       }
     }
   }
-  return "LangGraph run completed successfully.";
+  return "Execucao concluida.";
 }
 
 export async function execute(
@@ -358,6 +368,21 @@ export async function execute(
   }
   if (ctx.runId) {
     inputPayload.run_id = ctx.runId;
+  }
+  const continuation = ctx.executionContinuation as { messages?: Array<{ body?: string }> } | undefined;
+  const rawMsg =
+    (Array.isArray(continuation?.messages) && continuation!.messages.length > 0)
+      ? continuation!.messages[continuation!.messages.length - 1].body
+      : (typeof ctx.context.userPrompt === "string" ? ctx.context.userPrompt :
+        (typeof ctx.context.prompt === "string" ? ctx.context.prompt :
+        (typeof ctx.context.message === "string" ? ctx.context.message : null)));
+  if (rawMsg && typeof rawMsg === "string" && rawMsg.trim().length > 0) {
+    const trimmed = rawMsg.trim();
+    inputPayload.prompt = trimmed;
+    inputPayload.user_prompt = trimmed;
+    inputPayload.message = trimmed;
+    inputPayload.input = trimmed;
+    inputPayload.messages = [{ role: "user", content: trimmed }];
   }
 
   const requestContext: Record<string, JsonValue> = {
