@@ -15,6 +15,7 @@ import {
   Sparkles,
   Terminal,
   Cpu,
+  Network,
 } from "lucide-react";
 import { OpenCodeLogoIcon } from "@/components/OpenCodeLogoIcon";
 
@@ -152,6 +153,12 @@ const adapterDisplayMap: Record<string, AdapterDisplayInfo> = {
     description: "Internal HTTP adapter",
     icon: Cpu,
     comingSoon: true,
+  },
+  langgraph: {
+    label: "Fênix Specialist (LangGraph)",
+    description: "LangGraph orchestration runtime for Fênix specialists",
+    icon: Network,
+    recommended: true,
   },
 };
 

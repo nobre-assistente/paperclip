@@ -15,13 +15,18 @@ import { isNewAgentAdapterAllowed } from "@/lib/new-agent-adapters";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
-import { ArrowLeft, ArrowRight, Check, Settings2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Network, Settings2 } from "lucide-react";
 import type {
   AdapterEnvironmentTestResult,
   Agent,
+  AgentIconName,
   EnvBinding,
 } from "@paperclipai/shared";
-import { ADAPTER_AUTH_MISSING_CHECK_CODE } from "@paperclipai/shared";
+import {
+  ADAPTER_AUTH_MISSING_CHECK_CODE,
+  FENIX_SPECIALIST_PRESETS,
+  findFenixPreset,
+} from "@paperclipai/shared";
 import { useNavigate, useSearchParams } from "@/lib/router";
 import { agentsApi } from "@/api/agents";
 import { adaptersApi } from "@/api/adapters";
@@ -88,6 +93,11 @@ export function NewAgentSetup() {
       adapterType={params.get("adapterType") ?? ""}
       runnerProvider={params.get("runnerProvider") ?? "codex"}
       createdAgentId={params.get("createdAgentId")}
+      initialRole={params.get("role") ?? ""}
+      initialTitle={params.get("title") ?? ""}
+      initialIcon={params.get("icon") ?? ""}
+      initialAssistantId={params.get("assistantId") ?? ""}
+      initialBaseUrl={params.get("baseUrl") ?? ""}
     />
   );
 }
@@ -98,12 +108,22 @@ function Setup({
   adapterType,
   runnerProvider,
   createdAgentId,
+  initialRole = "",
+  initialTitle = "",
+  initialIcon = "",
+  initialAssistantId = "",
+  initialBaseUrl = "",
 }: {
   companyId: string;
   name: string;
   adapterType: string;
   runnerProvider: string;
   createdAgentId: string | null;
+  initialRole?: string;
+  initialTitle?: string;
+  initialIcon?: string;
+  initialAssistantId?: string;
+  initialBaseUrl?: string;
 }) {
   const navigate = useNavigate();
   const cache = useQueryClient();
@@ -127,7 +147,7 @@ function Setup({
   const chooseProvider = multiProvider || brandType === "hermes_local";
   const hasCredentialField =
     chooseProvider || Boolean(SETUP_CREDENTIAL_KEYS[adapterType]);
-  const showModel = !["cursor_cloud", "hermes_gateway"].includes(adapterType);
+  const showModel = !["cursor_cloud", "hermes_gateway", "langgraph"].includes(adapterType);
   const [gatewayUrl, setGatewayUrl] = useState("");
   const [kimiModel, setKimiModel] = useState("");
   const [kimiBaseUrl, setKimiBaseUrl] = useState("");
@@ -142,6 +162,42 @@ function Setup({
   const [environmentOverride, setEnvironmentOverride] = useState("");
   const [provider, setProvider] = useState("openrouter");
   const [apiKey, setApiKey] = useState("");
+  const [agentName, setAgentName] = useState(name);
+  const [agentRole, setAgentRole] = useState(initialRole);
+  const [agentTitle, setAgentTitle] = useState(initialTitle);
+  const [agentIcon, setAgentIcon] = useState(initialIcon);
+  const [langgraphBaseUrl, setLanggraphBaseUrl] = useState(
+    initialBaseUrl || "http://127.0.0.1:2024",
+  );
+  const [langgraphAssistantId, setLanggraphAssistantId] = useState(
+    initialAssistantId || "devops",
+  );
+  const [selectedPresetId, setSelectedPresetId] = useState(() => {
+    if (initialAssistantId) return initialAssistantId;
+    if (initialRole) return initialRole;
+    return adapterType === "langgraph" ? "devops" : "";
+  });
+
+  const isLocalLangGraph =
+    adapterType === "langgraph" &&
+    (!langgraphBaseUrl.trim() ||
+      langgraphBaseUrl.includes("127.0.0.1") ||
+      langgraphBaseUrl.includes("localhost"));
+
+  useEffect(() => {
+    if (adapterType === "langgraph" && !agentRole) {
+      const defaultPreset = findFenixPreset(selectedPresetId || "devops");
+      if (defaultPreset) {
+        if (!agentName) setAgentName(defaultPreset.name);
+        setAgentRole(defaultPreset.role);
+        setAgentTitle(defaultPreset.title);
+        setAgentIcon(defaultPreset.icon);
+        setLanggraphAssistantId(defaultPreset.adapterConfig.assistantId);
+        setLanggraphBaseUrl(defaultPreset.adapterConfig.baseUrl);
+        setSelectedPresetId(defaultPreset.id);
+      }
+    }
+  }, [adapterType]);
   const [providerBinding, setProviderBinding] = useState<EnvBinding | null>(
     null,
   );
@@ -236,27 +292,39 @@ function Setup({
   const managedOnly = experimental.data?.enableManagedSandboxOnly === true;
   let environmentId: string | null = null;
   let environmentError: string | null = null;
+  const localEnv = (envs.data ?? []).find((env) => env.driver === "local");
+  const localEnvId =
+    localEnv?.id ?? resolveLocalDefaultEnvironmentId(envs.data ?? []) ?? null;
+
   try {
-    environmentId = forced.forced
-      ? (forced.kubernetesEnvironment?.id ?? null)
-      : resolveAdapterTestEnvironmentId({
-          agentDefaultEnvironmentId: environmentOverride || null,
-          instanceDefaultEnvironmentId:
-            settings.data?.defaultEnvironmentId ?? null,
-          localDefaultEnvironmentId: resolveLocalDefaultEnvironmentId(
-            envs.data ?? [],
-          ),
-          managedSandboxOnly: managedOnly,
-          managedSandboxEnvironmentId: resolveManagedSandboxEnvironmentId(
-            envs.data ?? [],
-          ),
-          visibleEnvironmentIds: (envs.data ?? []).map((env) => env.id),
-        });
+    if (isLocalLangGraph) {
+      environmentId = environmentOverride || localEnvId;
+    } else {
+      environmentId = forced.forced
+        ? (forced.kubernetesEnvironment?.id ?? null)
+        : resolveAdapterTestEnvironmentId({
+            agentDefaultEnvironmentId: environmentOverride || null,
+            instanceDefaultEnvironmentId:
+              settings.data?.defaultEnvironmentId ?? null,
+            localDefaultEnvironmentId: resolveLocalDefaultEnvironmentId(
+              envs.data ?? [],
+            ),
+            managedSandboxOnly: managedOnly,
+            managedSandboxEnvironmentId: resolveManagedSandboxEnvironmentId(
+              envs.data ?? [],
+            ),
+            visibleEnvironmentIds: (envs.data ?? []).map((env) => env.id),
+          });
+    }
   } catch (cause) {
-    environmentError =
-      cause instanceof Error
-        ? cause.message
-        : "Could not resolve the environment.";
+    if (!isLocalLangGraph) {
+      environmentError =
+        cause instanceof Error
+          ? cause.message
+          : "Could not resolve the environment.";
+    } else {
+      environmentId = localEnvId;
+    }
   }
   const environment = envs.data?.find((env) => env.id === environmentId);
   const sandboxProvider =
@@ -321,7 +389,7 @@ function Setup({
     !general.error &&
     !agents.error &&
     !caps.error &&
-    (!(managedOnly || forced.forced) || environmentId),
+    (isLocalLangGraph || !(managedOnly || forced.forced) || environmentId),
   );
   const busy = testState === "running" || saving;
 
@@ -335,7 +403,7 @@ function Setup({
       model:
         model || (brandType === "codex_local" ? DEFAULT_CODEX_LOCAL_MODEL : ""),
       thinkingEffort: effort,
-      dangerouslyBypassSandbox: adapterType === "codex_local",
+      dangerouslyBypassSandbox: adapterType === "codex_local" || isLocalLangGraph,
       envBindings: nextConnection?.env ?? {},
       ...(isRunner
         ? {
@@ -345,14 +413,30 @@ function Setup({
             },
           }
         : {}),
+      ...(adapterType === "langgraph"
+        ? {
+            adapterSchemaValues: {
+              baseUrl: langgraphBaseUrl.trim() || "http://127.0.0.1:2024",
+              assistantId: langgraphAssistantId.trim() || "devops",
+            },
+          }
+        : {}),
     };
     const config = getUIAdapter(adapterType).buildAdapterConfig(values);
-    if (isRunner)
+    if (adapterType === "langgraph") {
+      Object.assign(config, {
+        baseUrl: langgraphBaseUrl.trim() || "http://127.0.0.1:2024",
+        assistantId: langgraphAssistantId.trim() || "devops",
+        dangerouslyBypassSandbox: isLocalLangGraph,
+      });
+    }
+    if (isRunner) {
       Object.assign(config, {
         provider: runnerProvider === "claude" ? "acpx" : runnerProvider,
         ...(runnerProvider === "claude" ? { acpxAgent: "claude" } : {}),
         ...(model ? { model } : {}),
       });
+    }
     if (!aiBinding && !nextConnection?.aiConnection && hasCredentialField && binding) {
       if (adapterType === "hermes_gateway") config.apiKey = binding;
       else
@@ -381,6 +465,11 @@ function Setup({
     return config;
   }
   function preparedConfig(nextConnection = connection) {
+    if (adapterType === "langgraph") {
+      if (!langgraphBaseUrl.trim()) throw new Error("Enter the LangGraph server base URL.");
+      if (!langgraphAssistantId.trim()) throw new Error("Enter the LangGraph assistant ID.");
+      return buildConfig(nextConnection);
+    }
     if (multiProvider && (!model.trim() || !model.includes("/")))
       throw new Error("Choose or enter a model in provider/model format.");
     if (
@@ -427,7 +516,7 @@ function Setup({
     setResult(null);
     setError(null);
     try {
-      const config = await preparedConfig(nextConnection);
+      const config = preparedConfig(nextConnection);
       const tested = await testAgentSetup({
         companyId,
         adapterType,
@@ -463,12 +552,11 @@ function Setup({
       createdAgentId ||
       created ||
       !ready ||
-      !name.trim() ||
+      !(agentName.trim() || name.trim()) ||
       testState === "running" ||
-      testState === "fail" ||
-      (connectionAdapter && !connection)
+      (!isLocalLangGraph && testState === "fail") ||
+      Boolean(connectionAdapter && !connection)
     )
-      return;
     savingRef.current = true;
     setSaving(true);
     setError(null);
@@ -498,15 +586,17 @@ function Setup({
         (agent) => agent.role === "ceo" && agent.status !== "terminated",
       );
       const response = await agentsApi.hire(companyId, {
-        name: name.trim(),
+        name: (agentName || name).trim(),
         appearance: appearanceDraft.appearance,
-        role: existing.length ? "general" : "ceo",
+        role: agentRole.trim() || (existing.length ? "general" : "ceo"),
+        ...(agentTitle.trim() ? { title: agentTitle.trim() } : {}),
+        ...(agentIcon.trim() ? { icon: agentIcon.trim() as AgentIconName } : {}),
         ...(leader ? { reportsTo: leader.id } : {}),
         adapterType,
         adapterConfig: config,
         defaultEnvironmentId:
           environmentOverride ||
-          (forced.forced || managedOnly ? environmentId : null),
+          (isLocalLangGraph ? (localEnvId ?? null) : (forced.forced || managedOnly ? environmentId : null)),
         runtimeConfig: { ...buildNewAgentRuntimeConfig({ heartbeatEnabled: false }), ...(aiBinding ? { aiConnection: aiBinding } : {}) },
         budgetMonthlyCents: 0,
         ...(connection?.storedSessionId
@@ -825,6 +915,116 @@ function Setup({
                             <AiConnectionField companyId={companyId} agentName={name} adapterType={brandType} model={model} environmentId={environmentId ?? undefined} value={aiBinding}
                               onChange={binding => { setRuntimeAiBinding(binding); resetTest(); }} />
                           )
+                        )}
+                        {adapterType === "langgraph" && (
+                          <div className="space-y-4 rounded-lg border border-border bg-card p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Network className="size-4 text-primary" />
+                                <h4 className="text-sm font-semibold">Fênix Specialist Configuration</h4>
+                              </div>
+                              {isLocalLangGraph && (
+                                <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                                  Local Runtime (Direct Creation)
+                                </span>
+                              )}
+                            </div>
+
+                            <Field
+                              label="Fênix Specialist Preset"
+                              hint="Choose from the 20 canonical Fênix specialist roles to auto-fill title, role, icon, and assistant settings."
+                            >
+                              <select
+                                aria-label="Fênix Specialist Preset"
+                                className={controlClass}
+                                value={selectedPresetId}
+                                onChange={(e) => {
+                                  const preset = findFenixPreset(e.target.value);
+                                  if (preset) {
+                                    setSelectedPresetId(preset.id);
+                                    setAgentName(preset.name);
+                                    setAgentRole(preset.role);
+                                    setAgentTitle(preset.title);
+                                    setAgentIcon(preset.icon);
+                                    setLanggraphAssistantId(preset.adapterConfig.assistantId);
+                                    setLanggraphBaseUrl(preset.adapterConfig.baseUrl);
+                                    resetTest();
+                                  }
+                                }}
+                              >
+                                <option value="">-- Select a Preset (20 specialists) --</option>
+                                {FENIX_SPECIALIST_PRESETS.map((preset) => (
+                                  <option key={preset.id} value={preset.id}>
+                                    {preset.title} ({preset.name})
+                                  </option>
+                                ))}
+                              </select>
+                            </Field>
+
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              <Field
+                                label="Agent Name"
+                                hint="Name shown in the organization roster and issue comments."
+                              >
+                                <Input
+                                  value={agentName}
+                                  onChange={(e) => setAgentName(e.target.value)}
+                                  className={controlClass}
+                                  placeholder="Fênix — DevOps Specialist"
+                                />
+                              </Field>
+
+                              <Field
+                                label="Professional Title"
+                                hint="Title shown on agent cards and details."
+                              >
+                                <Input
+                                  value={agentTitle}
+                                  onChange={(e) => setAgentTitle(e.target.value)}
+                                  className={controlClass}
+                                  placeholder="DevOps Specialist"
+                                />
+                              </Field>
+                            </div>
+
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              <Field
+                                label="LangGraph Server URL"
+                                hint="Base URL where the LangGraph server is listening (defaults to http://127.0.0.1:2024)."
+                              >
+                                <Input
+                                  value={langgraphBaseUrl}
+                                  onChange={(e) => {
+                                    setLanggraphBaseUrl(e.target.value);
+                                    resetTest();
+                                  }}
+                                  className={controlClass}
+                                  placeholder="http://127.0.0.1:2024"
+                                />
+                              </Field>
+
+                              <Field
+                                label="Assistant / Graph ID"
+                                hint="Registered graph identifier in langgraph.json."
+                              >
+                                <Input
+                                  value={langgraphAssistantId}
+                                  onChange={(e) => {
+                                    setLanggraphAssistantId(e.target.value);
+                                    resetTest();
+                                  }}
+                                  className={controlClass}
+                                  placeholder="devops"
+                                />
+                              </Field>
+                            </div>
+
+                            {isLocalLangGraph && (
+                              <p className="text-xs text-muted-foreground">
+                                Localhost LangGraph runtime detected. Sandbox container testing and external API keys are bypassed for direct local orchestration.
+                              </p>
+                            )}
+                          </div>
                         )}
                         {models.error && <p role="alert" className="text-sm text-destructive">Could not load models. Retry or enter a model ID manually.</p>}
                         {((showModel && !usingKimiApi) ||
@@ -1159,7 +1359,7 @@ function Setup({
                         disabled={
                           !ready ||
                           busy ||
-                          testState === "fail" ||
+                          (!isLocalLangGraph && testState === "fail") ||
                           Boolean(connectionAdapter && !connection)
                         }
                       >
