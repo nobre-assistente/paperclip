@@ -211,8 +211,7 @@ export function aiConnectionRoutes(db: Db, options: Parameters<typeof supportsLo
     const companyId = req.params.companyId as string;
     const { localSessionId, ...intent } = localAiConnectionSchema.parse(req.body);
     assertLocalLoginAvailable();
-    // Only implicit local operators may inspect ambient Claude credentials.
-    // Authenticated users sign in to their own company/user-scoped attempt.
+    // Ambient credential inspection: anthropic requires local operator; antigravity uses local pool.
     if (intent.provider === "anthropic" && !localSessionId) assertLocalOperator(req);
     const userId = await assertAiConnectionCreateAccess(db, req, companyId, intent);
     res.setHeader("Cache-Control", "no-store");
@@ -320,8 +319,10 @@ export function aiConnectionRoutes(db: Db, options: Parameters<typeof supportsLo
       const companyId = req.params.companyId as string;
       const { localSessionId, ...input } = localAiConnectionSchema.parse(req.body);
       assertLocalLoginAvailable();
+      // Ambient credential save: anthropic requires local operator; antigravity uses host account pool.
       if (input.provider === "anthropic" && !localSessionId) assertLocalOperator(req);
       const userId = await assertAiConnectionCreateAccess(db, req, companyId, input);
+      // Isolated session required for openai/xai; antigravity connects via host pool without localSessionId.
       if (localSessionId || input.provider === "openai" || input.provider === "xai") {
         if (!localSessionId) throw unprocessable("Start a separate local sign-in for this connection before connecting.");
         res.status(201).json(await localLogin.complete(companyId, userId, localSessionId, input));

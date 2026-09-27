@@ -1,4 +1,5 @@
 import { readLocalAiCredentialFile } from "./local-ai-credential-file.js";
+import { antigravityPoolService } from "./antigravity-pool.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { readClaudeToken, readIsolatedClaudeKeychainToken, fetchClaudeQuota } from "@paperclipai/adapter-claude-local/server";
@@ -13,6 +14,13 @@ export async function readVerifiedLocalAiCredential(provider: AiProvider, loginH
   if ((provider === "openai" || provider === "xai") && !loginHome)
     throw unprocessable("Start a separate local sign-in for this connection before connecting.");
   try {
+    if (provider === "antigravity") {
+      const status = await antigravityPoolService.getPoolStatus();
+      const activeAccountName = status.active;
+      const activeAcc = status.accounts?.find((a) => a.account === activeAccountName) || status.accounts?.[0];
+      if (!activeAcc || !activeAcc.account) throw new Error("Missing active Antigravity account");
+      return JSON.stringify({ provider: "antigravity", account: activeAcc.account });
+    }
     if (provider === "anthropic") {
       // Never change process.env or fall back to the server account when an
       // authenticated user's isolated login is missing or invalid.
@@ -57,6 +65,8 @@ export async function readVerifiedLocalAiCredential(provider: AiProvider, loginH
     // Provider/CLI errors may contain credential material; never return them.
     throw unprocessable(provider === "anthropic" && !loginHome
       ? "Could not verify the local subscription. Run claude auth login in a terminal on the machine running Paperclip, then try Connect again."
+      : provider === "antigravity"
+      ? "Could not verify Antigravity local pool. Ensure OMP accounts are configured, then try Connect again."
       : "Could not verify the local subscription. Run the sign-in command shown for this connection, finish signing in, then try Connect again.");
   }
 }

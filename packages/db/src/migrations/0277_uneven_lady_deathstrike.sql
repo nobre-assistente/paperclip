@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS "ai_provider_defaults" (
 	"provider" text NOT NULL,
 	"grant_id" uuid,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "ai_provider_defaults_provider_check" CHECK ("ai_provider_defaults"."provider" in ('anthropic','openai','openrouter','xai'))
+	CONSTRAINT "ai_provider_defaults_provider_check" CHECK ("ai_provider_defaults"."provider" in ('anthropic','openai','openrouter','xai','antigravity'))
 );
 --> statement-breakpoint
 DO $$ BEGIN ALTER TABLE "ai_provider_defaults" ADD CONSTRAINT "ai_provider_defaults_company_id_companies_id_fk" FOREIGN KEY ("company_id") REFERENCES "public"."companies"("id") ON DELETE cascade ON UPDATE no action; EXCEPTION WHEN duplicate_object THEN NULL; END $$;--> statement-breakpoint

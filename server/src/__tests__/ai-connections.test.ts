@@ -608,6 +608,28 @@ describe("managed AI connections", () => {
       expect((await service.list(companyId, owner)).filter(c => c.name === intent.name)).toHaveLength(1);
     } finally { reader.mockRestore(); }
   });
+  it("allows antigravity provider local check and connect without localSessionId", async () => {
+    const testUser = "antigravity-test-user";
+    await db.insert(companyMemberships).values({ companyId, principalId: testUser, principalType: "user", status: "active", membershipRole: "member" });
+    const app = express();
+    app.use(express.json());
+    app.use((req, _res, next) => {
+      req.actor = { type: "board", source: "session", userId: testUser, companyIds: [companyId], memberships: [{ companyId, status: "active", membershipRole: "member" }] };
+      next();
+    });
+    app.use("/api", aiConnectionRoutes(db));
+    app.use((error: { status?: number; message: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => { res.status(error.status ?? 500).json({ error: error.message }); });
+    const base = `/api/companies/${companyId}/ai-connections/local`;
+    const intent = { provider: "antigravity", method: "subscription", ownership: "personal", name: "OMP Pool Test", allAgents: false, agentIds: [] };
+
+    const checked = await request(app).post(`${base}/check`).send(intent);
+    expect(checked.status).toBe(200);
+    expect(checked.body).toEqual({ status: "ready" });
+
+    const saved = await request(app).post(base).send(intent);
+    expect(saved.status).toBe(201);
+    expect(saved.body.connectionId).toBeDefined();
+  });
   it("rejects invalid credentials without exposing the provider response", async () => {
     const request = vi.fn().mockResolvedValue(new Response("secret-provider-body", { status: 401 }));
     await expect(validateAiApiKey("anthropic", "fixture", request)).rejects.toThrow("rejected");

@@ -79,3 +79,23 @@ it("explicit retry can replace an attempt opened in another authentication host"
   await vi.waitFor(() => expect(host.textContent).toContain("isolated codex login"));
   expect(api.startLocalLogin).toHaveBeenLastCalledWith("company", expect.objectContaining({ restart: true }));
 });
+
+it("handles antigravity provider without isolated attempt or requiring local sign-in before connecting", async () => {
+  api.checkLocalLogin.mockResolvedValue({ status: "ready" });
+  function AntigravityHarness() {
+    const login = useLocalAiLogin("company", { provider: "antigravity", method: "subscription", name: "OMP Antigravity", ownership: "personal", agentIds: [], allAgents: true }, true);
+    return (
+      <>
+        <div>{login.isolated ? "isolated" : "not-isolated"}</div>
+        <div>{login.status}</div>
+        <button onClick={() => void login.connect()}>Connect</button>
+      </>
+    );
+  }
+  flushSync(() => root.render(<AntigravityHarness />));
+  expect(host.textContent).toContain("not-isolated");
+  await vi.waitFor(() => expect(api.checkLocalLogin).toHaveBeenCalledWith("company", expect.objectContaining({ provider: "antigravity" })));
+  expect(api.startLocalLogin).not.toHaveBeenCalled();
+  flushSync(() => Array.from(host.querySelectorAll('button')).find(b => b.textContent === 'Connect')!.click());
+  await vi.waitFor(() => expect(api.connectLocal).toHaveBeenCalledWith("company", expect.objectContaining({ provider: "antigravity" })));
+});

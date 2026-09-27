@@ -126,7 +126,7 @@ export function localAiLoginService(db: Db) {
   // login. Scope and intent are checked before touching an attempt's directory.
   async function check(companyId: string, userId: string, intent: AiConnectionLoginIntent, id?: string): Promise<LocalAiLoginStatus> {
     let directory: string | undefined;
-    if (id || intent.provider !== "anthropic") {
+    if (id || (intent.provider !== "anthropic" && intent.provider !== "antigravity")) {
       if (!id) throw unprocessable("Start local sign-in before checking this account.");
       const [session] = await db.select().from(adapterAuthSessions).where(and(
         eq(adapterAuthSessions.id, id), eq(adapterAuthSessions.companyId, companyId),

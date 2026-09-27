@@ -206,9 +206,40 @@ export function getNodeDetail(
     });
   }
 
+  const rawData = (node.data && typeof node.data === "object") ? (node.data as Record<string, unknown>) : {};
+  const rawMeta = (node.metadata && typeof node.metadata === "object") ? (node.metadata as Record<string, unknown>) : {};
+
+  const stateVal = rawData.state ?? rawData.status ?? rawData.node_state ?? rawMeta.state;
+  const stateStr = typeof stateVal === "string" ? stateVal : undefined;
+
+  const tokensVal = rawData.tokens_consumed ?? rawData.tokensConsumed ?? rawData.tokens ?? rawMeta.tokens_consumed;
+  let tokensConsumed: NodeDetail["tokensConsumed"] = undefined;
+  if (typeof tokensVal === "number" || typeof tokensVal === "string") {
+    tokensConsumed = tokensVal;
+  } else if (typeof tokensVal === "object" && tokensVal !== null) {
+    const rec = tokensVal as Record<string, unknown>;
+    tokensConsumed = {
+      prompt: typeof rec.prompt === "number" ? rec.prompt : undefined,
+      completion: typeof rec.completion === "number" ? rec.completion : undefined,
+      total: typeof rec.total === "number" ? rec.total : undefined,
+    };
+  }
+
+  const logsVal = rawData.execution_logs ?? rawData.executionLogs ?? rawData.logs ?? rawMeta.execution_logs;
+  let executionLogs: NodeDetail["executionLogs"] = undefined;
+  if (typeof logsVal === "string") {
+    executionLogs = logsVal;
+  } else if (Array.isArray(logsVal)) {
+    executionLogs = logsVal.map((item) => String(item));
+  }
+
   return {
     id: node.id,
     type: canvasType,
     fields,
+    state: stateStr,
+    status: stateStr,
+    tokensConsumed,
+    executionLogs,
   };
 }

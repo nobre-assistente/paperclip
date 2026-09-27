@@ -55,7 +55,7 @@ export function Canvas() {
       }
       return langgraphAgents[0].id;
     }
-    return "";
+    return "orchestrator";
   }, [urlAssistantId, langgraphAgents]);
 
   const [inputAssistantId, setInputAssistantId] = useState(defaultAssistantId);

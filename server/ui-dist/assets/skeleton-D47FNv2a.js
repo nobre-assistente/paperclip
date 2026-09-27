@@ -1,0 +1,1 @@
+import{i as e}from"./rolldown-runtime-BQ-vy_Pv.js";import{Lr as o,T as s}from"./zap-FBTL9tl0.js";var a=e(o(),1);function m({className:r,...t}){return(0,a.jsx)("div",{"data-slot":"skeleton",className:s("bg-accent/75 rounded-md",r),...t})}export{m as t};

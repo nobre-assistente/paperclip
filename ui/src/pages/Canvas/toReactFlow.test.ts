@@ -145,4 +145,31 @@ describe("toReactFlow", () => {
       expect(node.position.y).toBeTypeOf("number");
     }
   });
+
+  it("getNodeDetail extracts state, tokensConsumed, and executionLogs for properties panel", () => {
+    const node = {
+      id: "solution_architect",
+      type: "executor",
+      data: {
+        role: "Solution Architect Senior",
+        state: "completed",
+        tokens_consumed: { prompt: 1540, completion: 420, total: 1960 },
+        execution_logs: [
+          "Loaded project architecture requirements",
+          "Validated system blueprint constraints",
+          "Generated architecture envelope",
+        ],
+      },
+    };
+
+    const detail = getNodeDetail(node, []);
+    expect(detail.id).toBe("solution_architect");
+    expect(detail.state).toBe("completed");
+    expect(detail.tokensConsumed).toEqual({ prompt: 1540, completion: 420, total: 1960 });
+    expect(detail.executionLogs).toEqual([
+      "Loaded project architecture requirements",
+      "Validated system blueprint constraints",
+      "Generated architecture envelope",
+    ]);
+  });
 });

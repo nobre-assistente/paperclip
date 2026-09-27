@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS "ai_connection_defaults" (
 	"method" text NOT NULL,
 	"grant_id" uuid,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "ai_connection_defaults_provider_check" CHECK ("ai_connection_defaults"."provider" in ('anthropic','openai','openrouter','xai')),
+	CONSTRAINT "ai_connection_defaults_provider_check" CHECK ("ai_connection_defaults"."provider" in ('anthropic','openai','openrouter','xai','antigravity')),
 	CONSTRAINT "ai_connection_defaults_method_check" CHECK ("ai_connection_defaults"."method" in ('subscription','api_key'))
 );
 --> statement-breakpoint
