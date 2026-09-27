@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import type { AgentIconName } from "../constants.js";
 
 export const FENIX_GENESIS_COMPANY_ID = "f1453093-9739-4dc9-a6c2-522abef97d3b";
@@ -29,20 +28,65 @@ export interface FenixSpecialistSeed {
   metadata: Record<string, unknown>;
 }
 
-export function generateDeterministicUuid(namespace: string, name: string): string {
-  const hash = createHash("sha256").update(`${namespace}:${name}`).digest("hex");
-  const p1 = hash.substring(0, 8);
-  const p2 = hash.substring(8, 12);
-  const p3 = `4${hash.substring(13, 16)}`;
-  const p4 = `${((Number.parseInt(hash.substring(16, 18), 16) & 0x3f) | 0x80).toString(16).padStart(2, "0")}${hash.substring(18, 20)}`;
-  const p5 = hash.substring(20, 32);
-  return `${p1}-${p2}-${p3}-${p4}-${p5}`;
-}
+// Precomputed deterministic UUID constants (100% browser-safe, zero node:crypto dependencies)
+export const FENIX_SOLUTION_ARCHITECT_ID = "8e5ee226-c3e9-41e5-a615-9e95d3476790";
+export const FENIX_BACKEND_SENIOR_ID = "ef676df3-35c2-4685-aef2-514996dc2ad3";
+export const FENIX_DEVOPS_ID = "524095c6-2f9f-4e80-aa24-9afe2bba2682";
+export const FENIX_UIUX_ID = "ecb910d2-706e-4e8e-ac70-c7887964b39b";
+export const FENIX_CODE_QA_ID = "1d4592dd-6d0f-4881-ab46-17ebeb1cc9ed";
+export const FENIX_BRAND_SENTINEL_ID = "ca14e4bc-84f4-4153-ae75-45fea3214420";
+export const FENIX_LEGAL_SECURITY_ID = "7944dd29-6603-4c5f-a396-ba140eb29be4";
+export const FENIX_COPYWRITER_ID = "cd20e0fa-6b30-405a-a45a-2fcc8338cd76";
+export const FENIX_GROWTH_ID = "31f4e558-8756-42cf-a8f3-4c983648c996";
+export const FENIX_SEO_ID = "f1ff171d-c21a-4496-a3ac-f5bc78105eb9";
+export const FENIX_PAID_TRAFFIC_ID = "bece548a-b574-4d59-ab88-7d05133bf865";
+export const FENIX_DPO_ID = "7db26700-27b2-4c31-a19c-1a82855aa9bc";
+export const FENIX_LOCALIZATION_ID = "94fff6dd-f1ae-420d-a8a5-8e4c7d913c3d";
+export const FENIX_DATA_ANALYST_ID = "02754e2c-ea1a-4116-a1f3-e59d72c8292b";
+export const FENIX_CRM_ID = "c569f2cc-2cca-49e5-acee-eec88a33ed07";
+export const FENIX_MODEL_RISK_ID = "edc24079-ea49-496f-a65f-a6f6b42c1510";
+export const FENIX_GRAPHIC_DESIGNER_ID = "53268aae-2cff-4f75-a564-a0aa380d0a95";
+export const FENIX_ACCESSIBILITY_ID = "533e6ccc-0033-4cc1-a616-6857b874b251";
+export const FENIX_API_CONTRACT_ID = "48644daa-9c89-45b4-accc-5deedb6baa01";
+export const FENIX_FRONTEND_ID = "90e27e22-be5e-4e29-a427-77c11966f1f7";
 
-export const FENIX_SOLUTION_ARCHITECT_ID = generateDeterministicUuid(
-  FENIX_GENESIS_COMPANY_ID,
-  "solution_architect",
-);
+const PRECOMPUTED_UUIDS: Record<string, string> = {
+  solution_architect: FENIX_SOLUTION_ARCHITECT_ID,
+  backend_senior: FENIX_BACKEND_SENIOR_ID,
+  devops: FENIX_DEVOPS_ID,
+  uiux: FENIX_UIUX_ID,
+  code_qa: FENIX_CODE_QA_ID,
+  brand_sentinel: FENIX_BRAND_SENTINEL_ID,
+  legal_security: FENIX_LEGAL_SECURITY_ID,
+  copywriter: FENIX_COPYWRITER_ID,
+  growth: FENIX_GROWTH_ID,
+  seo: FENIX_SEO_ID,
+  paid_traffic: FENIX_PAID_TRAFFIC_ID,
+  dpo: FENIX_DPO_ID,
+  localization: FENIX_LOCALIZATION_ID,
+  data_analyst: FENIX_DATA_ANALYST_ID,
+  crm: FENIX_CRM_ID,
+  model_risk: FENIX_MODEL_RISK_ID,
+  graphic_designer: FENIX_GRAPHIC_DESIGNER_ID,
+  accessibility: FENIX_ACCESSIBILITY_ID,
+  api_contract: FENIX_API_CONTRACT_ID,
+  frontend: FENIX_FRONTEND_ID,
+};
+
+export function generateDeterministicUuid(namespace: string, name: string): string {
+  if (PRECOMPUTED_UUIDS[name]) return PRECOMPUTED_UUIDS[name];
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  const str = `${namespace}:${name}`;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  const hex = (h1 >>> 0).toString(16).padStart(8, "0") + (h2 >>> 0).toString(16).padStart(8, "0");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(12, 15)}-a${hex.slice(15, 18)}-${hex.repeat(2).slice(0, 12)}`;
+}
 
 export const FENIX_WAVE6_SPECIALISTS: readonly FenixSpecialistSeed[] = [
   {
