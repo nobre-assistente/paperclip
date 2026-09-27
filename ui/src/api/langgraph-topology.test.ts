@@ -1,3 +1,6 @@
+import { vi } from "vitest";
+import { api } from "./client";
+import { langgraphTopologyApi } from "./langgraph-topology";
 import { describe, expect, it } from "vitest";
 import { decodeLangGraphTopology } from "./langgraph-topology";
 
@@ -121,5 +124,57 @@ describe("LangGraph Topology Decoder", () => {
     expect(topology.nodes[3].type).toBe("end");
     expect(topology.nodes[3].data).toEqual({});
     expect(topology.edges[1].conditional).toBe(true);
+  });
+
+  it("calls executeIsolatedNode with encoded assistant and node IDs", async () => {
+    const postSpy = vi.spyOn(api, "post").mockResolvedValueOnce({
+      id: "run-1",
+      nodeId: "devops",
+      assistantId: "asst-1",
+      status: "success",
+      durationMs: 150,
+      tokensConsumed: { total: 400 },
+      inputs: {},
+      outputs: { status: "completed" },
+    });
+
+    const res = await langgraphTopologyApi.executeIsolatedNode("asst-1", "devops", {
+      bypass: true,
+    });
+
+    expect(postSpy).toHaveBeenCalledWith(
+      "/assistants/asst-1/nodes/devops/execute",
+      { bypass: true },
+      undefined,
+    );
+    expect(res.status).toBe("success");
+    expect(res.nodeId).toBe("devops");
+    postSpy.mockRestore();
+  });
+
+  it("calls homologateFlow with encoded assistant ID", async () => {
+    const postSpy = vi.spyOn(api, "post").mockResolvedValueOnce({
+      id: "homo-1",
+      assistantId: "asst-1",
+      status: "success",
+      durationMs: 500,
+      nodesCount: 5,
+      edgesCount: 4,
+      summary: "Pipeline validated",
+      validationResults: [],
+    });
+
+    const res = await langgraphTopologyApi.homologateFlow("asst-1", {
+      topology: {},
+    });
+
+    expect(postSpy).toHaveBeenCalledWith(
+      "/assistants/asst-1/homologate",
+      { topology: {} },
+      undefined,
+    );
+    expect(res.status).toBe("success");
+    expect(res.summary).toBe("Pipeline validated");
+    postSpy.mockRestore();
   });
 });

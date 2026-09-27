@@ -20,6 +20,49 @@ export interface LangGraphTopology {
   edges: LangGraphEdge[];
 }
 
+export interface ExecuteNodePayload {
+  inputs?: Record<string, unknown>;
+  config?: Record<string, unknown>;
+  bypass?: boolean;
+  forceHitl?: boolean;
+  mockOutput?: string;
+}
+
+export interface NodeExecutionResponse {
+  id: string;
+  nodeId: string;
+  assistantId: string;
+  status: "success" | "failed" | "bypassed" | "interrupted";
+  timestamp: string;
+  durationMs: number;
+  tokensConsumed: { prompt?: number; completion?: number; total?: number };
+  inputs: unknown;
+  outputs: unknown;
+  artifacts?: Array<{
+    name: string;
+    type: string;
+    size?: string | number;
+    content: unknown;
+  }>;
+  logs?: string[];
+}
+
+export interface FlowHomologationResponse {
+  id: string;
+  assistantId: string;
+  status: "success" | "failed";
+  timestamp: string;
+  durationMs: number;
+  nodesCount: number;
+  edgesCount: number;
+  summary: string;
+  validationResults: Array<{
+    phase: string;
+    status: "passed" | "failed" | "warning";
+    message: string;
+  }>;
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -137,6 +180,29 @@ export const langgraphTopologyApi = {
   getGraph: async (assistantId: string, options?: RequestOptions): Promise<LangGraphTopology> => {
     const raw = await api.get<unknown>(`/assistants/${encodeURIComponent(assistantId)}/graph`, options);
     return decodeLangGraphTopology(raw);
+  },
+  executeIsolatedNode: async (
+    assistantId: string,
+    nodeId: string,
+    payload?: ExecuteNodePayload,
+    options?: RequestOptions,
+  ): Promise<NodeExecutionResponse> => {
+    return api.post<NodeExecutionResponse>(
+      `/assistants/${encodeURIComponent(assistantId)}/nodes/${encodeURIComponent(nodeId)}/execute`,
+      payload ?? {},
+      options,
+    );
+  },
+  homologateFlow: async (
+    assistantId: string,
+    payload?: Record<string, unknown>,
+    options?: RequestOptions,
+  ): Promise<FlowHomologationResponse> => {
+    return api.post<FlowHomologationResponse>(
+      `/assistants/${encodeURIComponent(assistantId)}/homologate`,
+      payload ?? {},
+      options,
+    );
   },
 };
 

@@ -1,6 +1,14 @@
 import { MarkerType, type Node, type Edge } from "@xyflow/react";
 import type { LangGraphTopology, LangGraphNode, LangGraphEdge } from "@/api/langgraph-topology";
-import type { CanvasNodeType, NodeDetail } from "./types";
+import { resolveSpecialistRole, getSpecialistDefaultContract } from "@paperclipai/shared";
+import type {
+  CanvasNodeType,
+  NodeDetail,
+  CanvasNodeData,
+  NodeRuntimeControls,
+  NodeConfigParameters,
+  NodeExecutionRecord,
+} from "./types";
 
 export function resolveCanvasNodeType(
   node: LangGraphNode,
@@ -57,8 +65,17 @@ export function resolveCanvasNodeType(
   return "executor";
 }
 
-export function toReactFlow(topology: LangGraphTopology): {
-  nodes: Node<LangGraphNode>[];
+export interface ToReactFlowOptions {
+  controls?: Record<string, NodeRuntimeControls>;
+  parameters?: Record<string, Partial<NodeConfigParameters>>;
+  runningNodeIds?: Set<string> | string[];
+}
+
+export function toReactFlow(
+  topology: LangGraphTopology,
+  options?: ToReactFlowOptions,
+): {
+  nodes: Node<CanvasNodeData>[];
   edges: Edge[];
 } {
   const { nodes: lgNodes, edges: lgEdges } = topology;
@@ -128,7 +145,13 @@ export function toReactFlow(topology: LangGraphTopology): {
     levelGroups.get(lvl)!.push(node);
   }
 
-  const nodes: Node<LangGraphNode>[] = [];
+  const runningIds = options?.runningNodeIds instanceof Set
+    ? options.runningNodeIds
+    : Array.isArray(options?.runningNodeIds)
+      ? new Set(options.runningNodeIds)
+      : null;
+
+  const nodes: Node<CanvasNodeData>[] = [];
   for (const [lvl, group] of levelGroups.entries()) {
     const count = group.length;
     group.forEach((lgNode, idx) => {
@@ -136,11 +159,27 @@ export function toReactFlow(topology: LangGraphTopology): {
       const y = lvl * 130 + 50;
       const canvasType = resolveCanvasNodeType(lgNode, lgEdges);
 
+      const nodeControls = options?.controls?.[lgNode.id];
+      const nodeParams = options?.parameters?.[lgNode.id];
+      const isRunning = runningIds ? runningIds.has(lgNode.id) : false;
+
+      const nodeData: CanvasNodeData = {
+        ...lgNode,
+        label: lgNode.id,
+        nodeType: lgNode.type,
+        canvasType,
+        nodeData: (lgNode.data as Record<string, unknown>) ?? {},
+        originalNode: lgNode,
+        controls: nodeControls,
+        parameters: nodeParams,
+        isRunning,
+      };
+
       nodes.push({
         id: lgNode.id,
         type: canvasType,
         position: { x, y },
-        data: lgNode,
+        data: nodeData,
       });
     });
   }
@@ -169,9 +208,18 @@ export function toReactFlow(topology: LangGraphTopology): {
   return { nodes, edges };
 }
 
+export interface GetNodeDetailOptions {
+  controls?: NodeRuntimeControls;
+  parameters?: NodeConfigParameters;
+  history?: NodeExecutionRecord[];
+  agentId?: string;
+  agentName?: string;
+}
+
 export function getNodeDetail(
   node: LangGraphNode,
   edges: LangGraphEdge[] = [],
+  options?: GetNodeDetailOptions,
 ): NodeDetail {
   const canvasType = resolveCanvasNodeType(node, edges);
   const fields: Array<{ label: string; value: string }> = [
@@ -233,6 +281,53 @@ export function getNodeDetail(
     executionLogs = logsVal.map((item) => String(item));
   }
 
+  const durationVal =
+    rawData.duration_ms ??
+    rawData.durationMs ??
+    rawMeta.duration_ms ??
+    rawMeta.durationMs;
+  const durationMs = typeof durationVal === "number" ? durationVal : undefined;
+
+  const resolvedRole = resolveSpecialistRole(node.id);
+  const defaultContract = resolvedRole ? getSpecialistDefaultContract(resolvedRole) : {};
+
+  const effectiveParameters: NodeConfigParameters = {
+    assistantId: (rawData.assistantId as string | undefined) ?? node.id,
+    model:
+      (rawData.model as string | undefined) ??
+      (rawMeta.model as string | undefined) ??
+      "google-antigravity/gemini-3.8-flash",
+    temperature:
+      typeof rawData.temperature === "number"
+        ? rawData.temperature
+        : typeof rawMeta.temperature === "number"
+          ? rawMeta.temperature
+          : 0.7,
+    systemPrompt:
+      (rawData.systemPrompt as string | undefined) ??
+      (rawData.prompt as string | undefined) ??
+      (rawMeta.systemPrompt as string | undefined) ??
+      "",
+    timeoutMs:
+      typeof rawData.timeoutMs === "number"
+        ? rawData.timeoutMs
+        : typeof rawData.timeout_ms === "number"
+          ? rawData.timeout_ms
+          : 30000,
+    specialistRole: resolvedRole,
+    specialistContract:
+      (rawData.specialistContract as Record<string, unknown> | undefined) ??
+      defaultContract,
+    ...(options?.parameters ?? {}),
+  };
+
+  const effectiveControls: NodeRuntimeControls = {
+    bypass: Boolean(rawData.bypass),
+    forceHitl: Boolean(rawData.forceHitl || canvasType === "interrupt"),
+    mockOutput: typeof rawData.mockOutput === "string" ? rawData.mockOutput : undefined,
+    ...(options?.controls ?? {}),
+  };
+
   return {
     id: node.id,
     type: canvasType,
@@ -241,5 +336,11 @@ export function getNodeDetail(
     status: stateStr,
     tokensConsumed,
     executionLogs,
+    durationMs,
+    controls: effectiveControls,
+    parameters: effectiveParameters,
+    history: options?.history,
+    agentId: options?.agentId,
+    agentName: options?.agentName,
   };
 }

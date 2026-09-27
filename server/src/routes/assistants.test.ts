@@ -139,4 +139,57 @@ describe("assistantRoutes", () => {
     expect(edges.some(e => e.source === "drift_watchdog" && e.target === "__end__")).toBe(true);
     expect(edges.some(e => e.source === "post_compliance" && e.target === "__end__")).toBe(false);
   });
+
+  it("executes isolated node test successfully", async () => {
+    const app = buildApp();
+    const res = await request(app)
+      .post("/assistants/asst-123/nodes/devops/execute")
+      .send({ inputs: { action: "plan_deployment" } });
+
+    expect(res.status).toBe(200);
+    expect(res.body.nodeId).toBe("devops");
+    expect(res.body.status).toBe("success");
+    expect(res.body.outputs.specialist).toContain("DevOps");
+    expect(res.body.artifacts).toBeDefined();
+    expect(res.body.artifacts[0].name).toBe("devops_output.json");
+    expect(res.body.logs.length).toBeGreaterThan(0);
+  });
+
+  it("handles bypass / mock flag on isolated node test", async () => {
+    const app = buildApp();
+    const res = await request(app)
+      .post("/assistants/asst-123/nodes/devops/execute")
+      .send({ bypass: true, mockOutput: "Custom mock deployment response" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.nodeId).toBe("devops");
+    expect(res.body.status).toBe("bypassed");
+    expect(res.body.outputs.result).toBe("Custom mock deployment response");
+    expect(res.body.tokensConsumed.total).toBe(0);
+  });
+
+  it("handles forceHitl flag on isolated node test", async () => {
+    const app = buildApp();
+    const res = await request(app)
+      .post("/assistants/asst-123/nodes/devops/execute")
+      .send({ forceHitl: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.nodeId).toBe("devops");
+    expect(res.body.status).toBe("interrupted");
+    expect(res.body.outputs.interrupted).toBe(true);
+    expect(res.body.logs.some((l: string) => l.includes("Pausa forçada (HITL)"))).toBe(true);
+  });
+
+  it("homologates complete assistant pipeline flow", async () => {
+    const app = buildApp();
+    const res = await request(app)
+      .post("/assistants/orchestrator/homologate")
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body.assistantId).toBe("orchestrator");
+    expect(res.body.status).toBe("success");
+    expect(res.body.validationResults).toHaveLength(4);
+  });
 });

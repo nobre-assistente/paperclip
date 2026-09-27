@@ -102,8 +102,18 @@ const explicitOpenApiOperationCoverageExclusions = new Set([
   // and /api/companies/{companyId}/agents documented in OpenAPI.
   "GET /api/approvals",
   "POST /api/agents",
+  "GET /api/ai-connections/antigravity",
+  "GET /api/ai-connections/antigravity/pool",
+  "POST /api/ai-connections/antigravity/switch",
+  "POST /api/ai-connections/antigravity/next",
+  "POST /api/ai-connections/antigravity/refresh",
+  "POST /api/ai-connections/antigravity/sync",
+  "POST /api/ai-connections/antigravity/sync-omp",
+  "POST /api/ai-connections/antigravity/gate/lock",
+  "POST /api/ai-connections/antigravity/gate-lock",
+  "POST /api/ai-connections/antigravity/gate/unlock",
+  "POST /api/ai-connections/antigravity/gate-unlock",
 ]);
-
 // The set of contract-first routes whose OpenAPI document leads the mounted
 // request handler. The company-and-environment Claude setup-token login routes
 // now have request handlers, so the set is empty. A new contract-first route

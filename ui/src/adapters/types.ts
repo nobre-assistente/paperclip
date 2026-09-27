@@ -52,7 +52,7 @@ export interface AdapterConfigFieldsProps {
   managedSandboxOnly?: boolean;
   /** Agent entity when editing an existing agent */
   agent?: Agent | null;
-
+}
 export interface UIAdapterModule extends TranscriptParserSource {
   type: string;
   label: string;

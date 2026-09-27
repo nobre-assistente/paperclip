@@ -7061,6 +7061,51 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
+  path: "/api/assistants/{assistantId}/nodes/{nodeId}/execute",
+  tags: ["assistants"],
+  summary: "Execute isolated LangGraph node test",
+  request: {
+    params: z.object({ assistantId: z.string(), nodeId: z.string() }),
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            inputs: z.record(z.unknown()).optional(),
+            config: z.record(z.unknown()).optional(),
+            bypass: z.boolean().optional(),
+            forceHitl: z.boolean().optional(),
+            mockOutput: z.string().optional(),
+          }),
+        },
+      },
+    },
+  },
+  responses: { 200: r.ok(), 401: r.unauthorized, 404: r.notFound, 502: r.serverError },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/assistants/{assistantId}/homologate",
+  tags: ["assistants"],
+  summary: "Homologate complete LangGraph assistant pipeline flow",
+  request: {
+    params: z.object({ assistantId: z.string() }),
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            topology: z.record(z.unknown()).optional(),
+            nodesOverrides: z.record(z.unknown()).optional(),
+          }),
+        },
+      },
+    },
+  },
+  responses: { 200: r.ok(), 401: r.unauthorized, 404: r.notFound },
+});
+
+registry.registerPath({
+  method: "post",
   path: "/api/agents/{id}/approve",
   tags: ["agents"],
   summary: "Approve a pending agent action",

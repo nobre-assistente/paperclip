@@ -380,14 +380,14 @@ export function AntigravitySubscriptionPanel({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 bg-muted/30 border border-border">
         {/* Conta Ativa Atual */}
         <div className="space-y-1">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Conta Ativa Atual
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-semibold truncate text-foreground">
               {activeAccount?.account || data.active}
             </span>
-            <Badge className="bg-emerald-600/20 text-emerald-400 border border-emerald-500/40 text-[11px] font-bold px-2 py-0.5 whitespace-nowrap">
+            <Badge className="bg-emerald-600/20 text-emerald-400 border border-emerald-500/40 text-xs font-bold px-2 py-0.5 whitespace-nowrap">
               ATIVA · ID {activeOmpId} no OMP
             </Badge>
           </div>
@@ -395,7 +395,7 @@ export function AntigravitySubscriptionPanel({
 
         {/* Score de Risco Anti-Ban */}
         <div className="space-y-1">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Ban-Risk Index
           </div>
           <div className="flex items-center gap-2">
@@ -408,7 +408,7 @@ export function AntigravitySubscriptionPanel({
 
         {/* Status da Trava de Afinidade */}
         <div className="space-y-1">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Trava de Afinidade
           </div>
           <div className="flex items-center gap-2">
@@ -509,16 +509,16 @@ export function AntigravitySubscriptionPanel({
                     <span className="text-sm font-semibold truncate text-foreground">{acc.account}</span>
 
                     {isCurrentActive ? (
-                      <Badge className="bg-emerald-600/20 text-emerald-400 border border-emerald-500/40 text-[10px] font-bold px-1.5 py-0.5">
+                      <Badge className="bg-emerald-600/20 text-emerald-400 border border-emerald-500/40 text-xs font-bold px-1.5 py-0.5">
                         ATIVA · ID {ompAccountId} no OMP
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="text-muted-foreground text-[10px] font-medium px-1.5 py-0.5">
+                      <Badge variant="outline" className="text-muted-foreground text-xs font-medium px-1.5 py-0.5">
                         STANDBY · ID {ompAccountId}
                       </Badge>
                     )}
 
-                    <Badge variant="secondary" className="text-[10px] text-muted-foreground px-1.5 py-0.5 flex items-center gap-1">
+                    <Badge variant="secondary" className="text-xs text-muted-foreground px-1.5 py-0.5 flex items-center gap-1">
                       <CheckCircle2 className="size-3 text-emerald-400" />
                       ✔ OAuth
                     </Badge>

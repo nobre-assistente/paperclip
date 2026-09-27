@@ -1,0 +1,113 @@
+{
+  "work_item": "WI-13-006",
+  "issue": "FEA-434",
+  "title": "Canvas Low-Code Operante: Edição de Nós, Controles em Tempo Real e Persistência Bidirecional no LangGraph",
+  "timestamp": "2026-09-27T18:45:00.000Z",
+  "verdict": "PASS",
+  "scope_deliverables": {
+    "node_properties_studio": {
+      "file": "ui/src/pages/Canvas/NodePropertiesPanel.tsx",
+      "test_file": "ui/src/pages/Canvas/NodePropertiesPanel.test.tsx",
+      "tabs": [
+        {
+          "name": "parameters",
+          "label": "Parâmetros",
+          "capabilities": [
+            "Quick edit form for Assistant ID / LangGraph subgraph identifier",
+            "LLM model selection with presets (Google Antigravity Gemini 3.8 Flash, Gemini 2.5 Pro, OMP Claude 3.7 Sonnet, etc.) or custom model",
+            "Temperature adjustment (0.0 to 2.0)",
+            "Custom system prompt editing for specific node guidance",
+            "Timeout in ms configuration",
+            "Specialist contract fields injected dynamically based on 20 role schemas from @paperclipai/shared",
+            "Apply parameters locally and persist to agent in backend database"
+          ]
+        },
+        {
+          "name": "controls",
+          "label": "Controles & Ações",
+          "capabilities": [
+            "Botão Executar Nó Isolado: triggers individual test run via LangGraph Server API",
+            "Botão / Toggle Bypass / Mock: skips execution and provides custom mock output during rapid testing",
+            "Botão / Toggle Forçar Pausa (HITL): marks node for mandatory pipeline pause requiring human approval",
+            "Immediate execution feedback card with latency, status, and output data"
+          ]
+        },
+        {
+          "name": "telemetry",
+          "label": "Telemetria & Artefatos",
+          "capabilities": [
+            "Tokens consumed breakdown (Prompt, Completion, Total)",
+            "Execution latency / duration in ms",
+            "Input and output artifacts inspection with copy-to-clipboard functionality",
+            "Live execution terminal logs viewer with monospace styling",
+            "Execution history list displaying past runs with timestamps and status badges"
+          ]
+        }
+      ]
+    },
+    "canvas_top_toolbar": {
+      "file": "ui/src/pages/Canvas/index.tsx",
+      "test_file": "ui/src/pages/Canvas/Canvas.test.tsx",
+      "actions": [
+        {
+          "action": "Salvar Parâmetros / Topologia",
+          "description": "Persists modified node parameters and controls into Paperclip backend (agents table / adapter_config and metadata), updating corresponding agents",
+          "bidirectional_sync": true
+        },
+        {
+          "action": "Homologar Fluxo",
+          "description": "Dispatches an end-to-end test run against local LangGraph to validate full pipeline DAG connectivity, contract schemas, and HITL gates",
+          "report_dialog": true
+        },
+        {
+          "action": "Exportar Topologia",
+          "description": "Downloads full graph definition, nodes, edges, active parameters, and runtime controls as JSON for auditability",
+          "format": "JSON"
+        }
+      ]
+    },
+    "canvas_node_visuals": {
+      "files": [
+        "ui/src/pages/Canvas/CanvasNode.tsx",
+        "ui/src/pages/Canvas/toReactFlow.ts",
+        "ui/src/pages/Canvas/types.ts"
+      ],
+      "badges_and_states": [
+        "Running: Animated pulsing badge and border highlight for active nodes",
+        "Bypass / Mock: Amber badge and dashed border indicating simulated node execution",
+        "HITL Forced: Red destructive badge indicating mandatory human intervention breakpoint"
+      ]
+    },
+    "server_api_endpoints": {
+      "routes_file": "server/src/routes/assistants.ts",
+      "test_file": "server/src/routes/assistants.test.ts",
+      "openapi_file": "server/src/routes/openapi.ts",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/api/assistants/:assistantId/nodes/:nodeId/execute",
+          "summary": "Execute isolated LangGraph node test with bypass, HITL, and mock output support"
+        },
+        {
+          "method": "POST",
+          "path": "/api/assistants/:assistantId/homologate",
+          "summary": "Homologate complete LangGraph assistant pipeline flow validating contracts and gates"
+        }
+      ]
+    }
+  },
+  "validation_results": {
+    "ui_typecheck": "PASS (0 errors, tsc -b)",
+    "ui_build": "PASS (built in 14.58s)",
+    "token_gates_check": "PASS (0 violations, Gate 1, 2, 3, 4 clean)",
+    "canvas_unit_tests": {
+      "toReactFlow.test.ts": "8/8 passed",
+      "NodePropertiesPanel.test.tsx": "7/7 passed",
+      "CanvasNode.test.tsx": "5/5 passed",
+      "Canvas.test.tsx": "3/3 passed",
+      "langgraph-topology.test.ts": "4/4 passed",
+      "total_canvas_tests": 27
+    },
+    "server_assistants_tests": "8/8 passed"
+  }
+}
