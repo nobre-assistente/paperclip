@@ -48,7 +48,7 @@ describe("toReactFlow", () => {
 
     // Verify node data holds original node data
     expect(nodeMap.get("planner")?.data.id).toBe("planner");
-    expect(nodeMap.get("planner")?.data.data.role).toBe("Planner");
+    expect((nodeMap.get("planner")?.data.data as Record<string, unknown>).role).toBe("Planner");
 
     // Verify edge sources and targets
     expect(edges[0].source).toBe("__start__");
@@ -171,5 +171,71 @@ describe("toReactFlow", () => {
       "Validated system blueprint constraints",
       "Generated architecture envelope",
     ]);
+  });
+
+  it("toReactFlow integrates controls, parameters, and runningNodeIds options", () => {
+    const topology: LangGraphTopology = {
+      nodes: [
+        { id: "devops", type: "executor", data: {} },
+        { id: "gate", type: "interrupt", data: {} },
+      ],
+      edges: [{ source: "devops", target: "gate", conditional: false }],
+    };
+
+    const { nodes } = toReactFlow(topology, {
+      controls: {
+        devops: { bypass: true, forceHitl: false, mockOutput: "mock" },
+        gate: { bypass: false, forceHitl: true },
+      },
+      parameters: {
+        devops: { temperature: 0.2, timeoutMs: 15000 },
+      },
+      runningNodeIds: new Set(["devops"]),
+    });
+
+    const devopsNode = nodes.find((n) => n.id === "devops");
+    expect(devopsNode?.data.controls?.bypass).toBe(true);
+    expect(devopsNode?.data.parameters?.temperature).toBe(0.2);
+    expect(devopsNode?.data.isRunning).toBe(true);
+
+    const gateNode = nodes.find((n) => n.id === "gate");
+    expect(gateNode?.data.controls?.forceHitl).toBe(true);
+    expect(gateNode?.data.isRunning).toBe(false);
+  });
+
+  it("getNodeDetail hydrates durationMs, controls, parameters, history and agent info", () => {
+    const node = {
+      id: "devops",
+      type: "executor",
+      data: {
+        duration_ms: 320,
+        state: "completed",
+      },
+    };
+
+    const detail = getNodeDetail(node, [], {
+      controls: { bypass: true, forceHitl: false },
+      agentId: "agent-devops-uuid",
+      agentName: "Fênix — DevOps",
+      history: [
+        {
+          id: "run-1",
+          nodeId: "devops",
+          timestamp: "2026-09-27T10:00:00Z",
+          status: "success",
+          durationMs: 320,
+          tokensConsumed: { total: 500 },
+        },
+      ],
+    });
+
+    expect(detail.id).toBe("devops");
+    expect(detail.durationMs).toBe(320);
+    expect(detail.controls?.bypass).toBe(true);
+    expect(detail.agentId).toBe("agent-devops-uuid");
+    expect(detail.agentName).toBe("Fênix — DevOps");
+    expect(detail.parameters?.specialistRole).toBe("devops");
+    expect(detail.parameters?.specialistContract).toBeDefined();
+    expect(detail.history).toHaveLength(1);
   });
 });
